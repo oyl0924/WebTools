@@ -95,8 +95,10 @@ const deleteWebsite = async (website: Website) => {
 const addToDesktop = async (website: Website) => {
   try {
     await window.ipcRenderer.invoke('add-to-desktop', {
+      id: website.id,
       name: website.name,
-      url: website.url
+      url: website.url,
+      icon: website.icon
     })
     message.success('添加到桌面成功')
   } catch (error) {

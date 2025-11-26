@@ -1,6 +1,9 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fs from 'node:fs'
+import https from 'node:https'
+import http from 'node:http'
 import storageService from './storage'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -24,6 +27,82 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 
 let win: BrowserWindow | null
 const childWindows: Map<string, BrowserWindow> = new Map()
+
+// 获取图标存储目录
+function getIconsDir() {
+  const iconsDir = path.join(app.getPath('userData'), 'icons')
+  if (!fs.existsSync(iconsDir)) {
+    fs.mkdirSync(iconsDir, { recursive: true })
+  }
+  return iconsDir
+}
+
+// 下载图标到本地
+async function downloadIcon(iconUrl: string, websiteId: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    try {
+      const iconsDir = getIconsDir()
+      const ext = path.extname(new URL(iconUrl).pathname) || '.ico'
+      const iconPath = path.join(iconsDir, `${websiteId}${ext}`)
+      
+      // 如果图标已存在，直接返回
+      if (fs.existsSync(iconPath)) {
+        resolve(iconPath)
+        return
+      }
+      
+      const file = fs.createWriteStream(iconPath)
+      const protocol = iconUrl.startsWith('https') ? https : http
+      
+      const request = protocol.get(iconUrl, (response) => {
+        // 处理重定向
+        if (response.statusCode === 301 || response.statusCode === 302) {
+          const redirectUrl = response.headers.location
+          if (redirectUrl) {
+            file.close()
+            fs.unlinkSync(iconPath)
+            downloadIcon(redirectUrl, websiteId).then(resolve)
+            return
+          }
+        }
+        
+        if (response.statusCode !== 200) {
+          file.close()
+          fs.unlinkSync(iconPath)
+          resolve(null)
+          return
+        }
+        
+        response.pipe(file)
+        
+        file.on('finish', () => {
+          file.close()
+          resolve(iconPath)
+        })
+      })
+      
+      request.on('error', () => {
+        file.close()
+        if (fs.existsSync(iconPath)) {
+          fs.unlinkSync(iconPath)
+        }
+        resolve(null)
+      })
+      
+      request.setTimeout(10000, () => {
+        request.destroy()
+        file.close()
+        if (fs.existsSync(iconPath)) {
+          fs.unlinkSync(iconPath)
+        }
+        resolve(null)
+      })
+    } catch (error) {
+      console.error('下载图标失败:', error)
+      resolve(null)
+    }
+  })
+}
 
 function createWindow() {
   win = new BrowserWindow({
@@ -119,13 +198,8 @@ function createChildWindow(url: string, windowId: string, windowMode: 'normal' |
     }
   })
 
-  if (VITE_DEV_SERVER_URL) {
-    childWin.loadURL(`${VITE_DEV_SERVER_URL}#/webview?url=${encodeURIComponent(url)}`)
-  } else {
-    childWin.loadFile(path.join(RENDERER_DIST, 'index.html'), {
-      hash: `/webview?url=${encodeURIComponent(url)}`
-    })
-  }
+  // 直接加载网站 URL，不通过 webview，提高性能
+  childWin.loadURL(url)
 
   // 设置窗口标题
   if (websiteName) {
@@ -211,12 +285,21 @@ function setupIpcHandlers() {
       // 获取当前应用程序的路径
       const exePath = process.execPath
       
+      // 尝试下载网站图标
+      let iconPath = exePath
+      if (websiteData.icon) {
+        const downloadedIcon = await downloadIcon(websiteData.icon, websiteData.id || Date.now().toString())
+        if (downloadedIcon) {
+          iconPath = downloadedIcon
+        }
+      }
+      
       // 创建快捷方式，传递 URL 和网站名称
       const success = shell.writeShortcutLink(shortcutPath, {
         target: exePath,
         args: `--website-url="${websiteData.url}" --website-name="${websiteData.name}"`,
         description: websiteData.name,
-        icon: exePath,
+        icon: iconPath,
         iconIndex: 0
       })
       
