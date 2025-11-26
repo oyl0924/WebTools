@@ -4,7 +4,8 @@ export interface Website {
   name: string
   url: string
   icon?: string
-  fullscreen?: boolean
+  windowMode?: 'normal' | 'maximized' | 'fullscreen' // 窗口模式：正常、最大化、全屏
+  fullscreen?: boolean // 保留兼容性
   customButtons: CustomButton[]
 }
 

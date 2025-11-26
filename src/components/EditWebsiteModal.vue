@@ -21,7 +21,7 @@ const formState = reactive({
   name: '',
   url: '',
   icon: '',
-  fullscreen: false
+  windowMode: 'maximized' as 'normal' | 'maximized' | 'fullscreen'
 })
 
 const rules = {
@@ -40,7 +40,12 @@ watch(() => props.website, (newVal) => {
     formState.name = newVal.name
     formState.url = newVal.url
     formState.icon = newVal.icon || ''
-    formState.fullscreen = newVal.fullscreen || false
+    // 兼容旧数据：如果有 windowMode 就用，否则根据 fullscreen 决定
+    if (newVal.windowMode) {
+      formState.windowMode = newVal.windowMode
+    } else {
+      formState.windowMode = newVal.fullscreen ? 'fullscreen' : 'maximized'
+    }
   }
 }, { immediate: true })
 
@@ -58,7 +63,7 @@ const handleSubmit = async () => {
       name: formState.name,
       url: formState.url,
       icon: formState.icon,
-      fullscreen: formState.fullscreen
+      windowMode: formState.windowMode
     }
 
     await window.ipcRenderer.invoke('update-website', props.website.id, updates)
@@ -140,9 +145,12 @@ const autoGetIcon = () => {
         />
       </a-form-item>
 
-      <a-form-item label="全屏启动" name="fullscreen">
-        <a-switch v-model:checked="formState.fullscreen" />
-        <span style="margin-left: 8px; color: #999;">启用后窗口将以全屏模式打开</span>
+      <a-form-item label="窗口大小" name="windowMode">
+        <a-radio-group v-model:value="formState.windowMode">
+          <a-radio value="normal">正常</a-radio>
+          <a-radio value="maximized">最大化</a-radio>
+          <a-radio value="fullscreen">全屏</a-radio>
+        </a-radio-group>
       </a-form-item>
     </a-form>
   </a-modal>

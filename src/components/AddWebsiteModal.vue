@@ -20,7 +20,7 @@ const formState = reactive({
   name: '',
   url: '',
   icon: '',
-  fullscreen: false
+  windowMode: 'maximized' as 'normal' | 'maximized' | 'fullscreen'
 })
 
 const rules = {
@@ -45,7 +45,7 @@ const resetForm = () => {
   formState.name = ''
   formState.url = ''
   formState.icon = ''
-  formState.fullscreen = false
+  formState.windowMode = 'maximized'
 }
 
 // 提交表单
@@ -57,7 +57,7 @@ const handleSubmit = async () => {
       name: formState.name,
       url: formState.url,
       icon: formState.icon,
-      fullscreen: formState.fullscreen,
+      windowMode: formState.windowMode,
       customButtons: []
     }
 
@@ -140,9 +140,12 @@ const autoGetIcon = () => {
         />
       </a-form-item>
 
-      <a-form-item label="全屏启动" name="fullscreen">
-        <a-switch v-model:checked="formState.fullscreen" />
-        <span style="margin-left: 8px; color: #999;">启用后窗口将以全屏模式打开</span>
+      <a-form-item label="窗口大小" name="windowMode">
+        <a-radio-group v-model:value="formState.windowMode">
+          <a-radio value="normal">正常</a-radio>
+          <a-radio value="maximized">最大化</a-radio>
+          <a-radio value="fullscreen">全屏</a-radio>
+        </a-radio-group>
       </a-form-item>
     </a-form>
   </a-modal>

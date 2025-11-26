@@ -68,11 +68,19 @@ function createWindow() {
 }
 
 // 创建子窗口
-function createChildWindow(url: string, windowId: string, fullscreen: boolean = false) {
+function createChildWindow(url: string, windowId: string, windowMode: 'normal' | 'maximized' | 'fullscreen' | boolean = 'maximized', websiteName?: string) {
+  // 兼容旧的 boolean 类型（fullscreen 参数）
+  let mode: 'normal' | 'maximized' | 'fullscreen'
+  if (typeof windowMode === 'boolean') {
+    mode = windowMode ? 'fullscreen' : 'maximized'
+  } else {
+    mode = windowMode
+  }
+  
   const childWin = new BrowserWindow({
     width: 1000,
     height: 700,
-    fullscreen: fullscreen,
+    fullscreen: mode === 'fullscreen',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
@@ -81,6 +89,14 @@ function createChildWindow(url: string, windowId: string, fullscreen: boolean = 
       nodeIntegration: false
     },
   })
+
+  // 根据窗口模式设置窗口状态
+  if (mode === 'maximized') {
+    childWin.maximize()
+  } else if (mode === 'normal') {
+    // 正常模式不做特殊处理，使用默认大小
+  }
+  // fullscreen 已经在 BrowserWindow 配置中设置
 
   // 设置快捷键
   childWin.webContents.on('before-input-event', (event, input) => {
@@ -105,9 +121,18 @@ function createChildWindow(url: string, windowId: string, fullscreen: boolean = 
     })
   }
 
+  // 设置窗口标题
+  if (websiteName) {
+    childWin.setTitle(websiteName)
+  }
+
   // 等待页面加载后更新标题
-  childWin.webContents.on('page-title-updated', () => {
-    // 不阻止默认行为，让窗口显示网页自己的 title
+  childWin.webContents.on('page-title-updated', (event) => {
+    // 如果有网站名称，阻止默认行为，使用自定义名称
+    if (websiteName) {
+      event.preventDefault()
+      childWin.setTitle(websiteName)
+    }
   })
 
   childWindows.set(windowId, childWin)
@@ -157,9 +182,9 @@ function setupIpcHandlers() {
   })
 
   // 创建新窗口
-  ipcMain.handle('create-window', (_event, url, fullscreen = false) => {
+  ipcMain.handle('create-window', (_event, url, windowMode: 'normal' | 'maximized' | 'fullscreen' | boolean = 'maximized', websiteName?: string) => {
     const windowId = Date.now().toString()
-    createChildWindow(url, windowId, fullscreen)
+    createChildWindow(url, windowId, windowMode, websiteName)
     return windowId
   })
 
@@ -172,20 +197,20 @@ function setupIpcHandlers() {
   })
 
   // 添加到桌面
-  ipcMain.handle('add-to-desktop', async (_event, website) => {
+  ipcMain.handle('add-to-desktop', async (_event, websiteData) => {
     try {
       const desktopPath = app.getPath('desktop')
-      const shortcutPath = path.join(desktopPath, `${website.name}.lnk`)
+      const shortcutPath = path.join(desktopPath, `${websiteData.name}.lnk`)
       
       // 获取当前应用程序的路径
       const exePath = process.execPath
       
-      // 创建快捷方式
+      // 创建快捷方式，不使用 icon 字段（可能包含 base64 数据导致序列化错误）
       const success = shell.writeShortcutLink(shortcutPath, {
         target: exePath,
-        args: `--website-url="${website.url}"`,
-        description: website.name,
-        icon: website.icon || exePath,
+        args: `--website-url="${websiteData.url}"`,
+        description: websiteData.name,
+        icon: exePath,
         iconIndex: 0
       })
       
@@ -221,5 +246,17 @@ app.on('activate', () => {
 
 app.whenReady().then(() => {
   setupIpcHandlers()
-  createWindow()
+  
+  // 检查命令行参数，看是否是从桌面快捷方式启动
+  const websiteUrlArg = process.argv.find(arg => arg.startsWith('--website-url='))
+  
+  if (websiteUrlArg) {
+    // 从快捷方式启动，直接打开网站
+    const url = websiteUrlArg.split('=')[1].replace(/"/g, '')
+    const windowId = Date.now().toString()
+    createChildWindow(url, windowId, 'maximized')
+  } else {
+    // 正常启动，打开主窗口
+    createWindow()
+  }
 })
