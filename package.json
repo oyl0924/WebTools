@@ -1,11 +1,15 @@
 {
   "name": "webtools",
+  "productName": "WebTools",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "WebTools - 网站管理工具",
+  "author": "OYL0924",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build && electron-builder",
+    "build:win": "vue-tsc && vite build && electron-builder --win",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -24,5 +28,29 @@
     "vite-plugin-electron-renderer": "^0.14.5",
     "vue-tsc": "^2.0.26"
   },
-  "main": "dist-electron/main.js"
+  "main": "dist-electron/main.js",
+  "build": {
+    "appId": "com.webtools.app",
+    "productName": "WebTools",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "WebTools"
+    }
+  }
 }

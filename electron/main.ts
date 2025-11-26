@@ -80,6 +80,7 @@ function createChildWindow(url: string, windowId: string, windowMode: 'normal' |
   const childWin = new BrowserWindow({
     width: 1000,
     height: 700,
+    show: false, // 先不显示，等设置好大小后再显示
     fullscreen: mode === 'fullscreen',
     autoHideMenuBar: true,
     webPreferences: {
@@ -97,6 +98,11 @@ function createChildWindow(url: string, windowId: string, windowMode: 'normal' |
     // 正常模式不做特殊处理，使用默认大小
   }
   // fullscreen 已经在 BrowserWindow 配置中设置
+  
+  // 窗口准备好后再显示，避免闪烁
+  childWin.once('ready-to-show', () => {
+    childWin.show()
+  })
 
   // 设置快捷键
   childWin.webContents.on('before-input-event', (event, input) => {
@@ -205,10 +211,10 @@ function setupIpcHandlers() {
       // 获取当前应用程序的路径
       const exePath = process.execPath
       
-      // 创建快捷方式，不使用 icon 字段（可能包含 base64 数据导致序列化错误）
+      // 创建快捷方式，传递 URL 和网站名称
       const success = shell.writeShortcutLink(shortcutPath, {
         target: exePath,
-        args: `--website-url="${websiteData.url}"`,
+        args: `--website-url="${websiteData.url}" --website-name="${websiteData.name}"`,
         description: websiteData.name,
         icon: exePath,
         iconIndex: 0
@@ -249,14 +255,35 @@ app.whenReady().then(() => {
   
   // 检查命令行参数，看是否是从桌面快捷方式启动
   const websiteUrlArg = process.argv.find(arg => arg.startsWith('--website-url='))
+  const websiteNameArg = process.argv.find(arg => arg.startsWith('--website-name='))
   
   if (websiteUrlArg) {
-    // 从快捷方式启动，直接打开网站
+    // 从快捷方式启动，直接打开网站，不创建主窗口
     const url = websiteUrlArg.split('=')[1].replace(/"/g, '')
+    const websiteName = websiteNameArg ? websiteNameArg.split('=')[1].replace(/"/g, '') : undefined
     const windowId = Date.now().toString()
-    createChildWindow(url, windowId, 'maximized')
+    createChildWindow(url, windowId, 'maximized', websiteName)
   } else {
     // 正常启动，打开主窗口
     createWindow()
+  }
+})
+
+// 处理第二个实例启动（支持多个桌面图标同时打开）
+app.on('second-instance', (_event, commandLine) => {
+  // 检查第二个实例的命令行参数
+  const websiteUrlArg = commandLine.find(arg => arg.startsWith('--website-url='))
+  const websiteNameArg = commandLine.find(arg => arg.startsWith('--website-name='))
+  
+  if (websiteUrlArg) {
+    // 打开新的网站窗口
+    const url = websiteUrlArg.split('=')[1].replace(/"/g, '')
+    const websiteName = websiteNameArg ? websiteNameArg.split('=')[1].replace(/"/g, '') : undefined
+    const windowId = Date.now().toString()
+    createChildWindow(url, windowId, 'maximized', websiteName)
+  } else if (win) {
+    // 如果是正常启动，聘焦主窗口
+    if (win.isMinimized()) win.restore()
+    win.focus()
   }
 })
