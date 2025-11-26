@@ -6,12 +6,12 @@ import type { Website, CustomButton } from '../types'
 import { OPEN_MODE_OPTIONS } from '../types'
 
 interface Props {
-  visible: boolean
+  open: boolean
   website: Website
 }
 
 interface Emits {
-  (e: 'update:visible', value: boolean): void
+  (e: 'update:open', value: boolean): void
   (e: 'success'): void
 }
 
@@ -42,7 +42,7 @@ const rules = {
 
 // 关闭主弹窗
 const handleClose = () => {
-  emit('update:visible', false)
+  emit('update:open', false)
 }
 
 // 添加新按钮
@@ -125,7 +125,7 @@ const handleCancelButtonForm = () => {
 
 <template>
   <a-modal
-    :visible="visible"
+    :open="open"
     :title="`管理自定义按钮 - ${website.name}`"
     :width="700"
     @cancel="handleClose"
@@ -191,7 +191,7 @@ const handleCancelButtonForm = () => {
 
       <!-- 按钮表单弹窗 -->
       <a-modal
-        :visible="showButtonForm"
+        :open="showButtonForm"
         :title="editingButton ? '编辑按钮' : '添加按钮'"
         :width="500"
         @cancel="handleCancelButtonForm"

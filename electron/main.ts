@@ -1,7 +1,8 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fs from 'fs'
 import storageService from './storage'
 
 const require = createRequire(import.meta.url)
@@ -45,7 +46,11 @@ function createWindow() {
   // 设置快捷键
   win.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'F12') {
-      win?.webContents.toggleDevTools()
+      if (win?.webContents.isDevToolsOpened()) {
+        win.webContents.closeDevTools()
+      } else {
+        win?.webContents.openDevTools()
+      }
       event.preventDefault()
     } else if (input.key === 'F5') {
       win?.webContents.reload()
@@ -67,10 +72,11 @@ function createWindow() {
 }
 
 // 创建子窗口
-function createChildWindow(url: string, windowId: string) {
+function createChildWindow(url: string, windowId: string, fullscreen: boolean = false) {
   const childWin = new BrowserWindow({
     width: 1000,
     height: 700,
+    fullscreen: fullscreen,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
@@ -83,7 +89,11 @@ function createChildWindow(url: string, windowId: string) {
   // 设置快捷键
   childWin.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'F12') {
-      childWin.webContents.toggleDevTools()
+      if (childWin.webContents.isDevToolsOpened()) {
+        childWin.webContents.closeDevTools()
+      } else {
+        childWin.webContents.openDevTools()
+      }
       event.preventDefault()
     } else if (input.key === 'F5') {
       childWin.webContents.reload()
@@ -98,6 +108,11 @@ function createChildWindow(url: string, windowId: string) {
       hash: `/webview?url=${encodeURIComponent(url)}`
     })
   }
+
+  // 等待页面加载后更新标题
+  childWin.webContents.on('page-title-updated', (event, title) => {
+    // 不阻止默认行为，让窗口显示网页自己的 title
+  })
 
   childWindows.set(windowId, childWin)
 
@@ -146,9 +161,9 @@ function setupIpcHandlers() {
   })
 
   // 创建新窗口
-  ipcMain.handle('create-window', (_event, url) => {
+  ipcMain.handle('create-window', (_event, url, fullscreen = false) => {
     const windowId = Date.now().toString()
-    createChildWindow(url, windowId)
+    createChildWindow(url, windowId, fullscreen)
     return windowId
   })
 
@@ -157,6 +172,35 @@ function setupIpcHandlers() {
     const childWin = childWindows.get(windowId)
     if (childWin) {
       childWin.webContents.loadURL(url)
+    }
+  })
+
+  // 添加到桌面
+  ipcMain.handle('add-to-desktop', async (_event, website) => {
+    try {
+      const desktopPath = app.getPath('desktop')
+      const shortcutPath = path.join(desktopPath, `${website.name}.lnk`)
+      
+      // 获取当前应用程序的路径
+      const exePath = process.execPath
+      
+      // 创建快捷方式
+      const success = shell.writeShortcutLink(shortcutPath, {
+        target: exePath,
+        args: `--website-url="${website.url}"`,
+        description: website.name,
+        icon: website.icon || exePath,
+        iconIndex: 0
+      })
+      
+      if (success) {
+        return { success: true }
+      } else {
+        throw new Error('创建快捷方式失败')
+      }
+    } catch (error) {
+      console.error('添加到桌面失败:', error)
+      throw error
     }
   })
 }

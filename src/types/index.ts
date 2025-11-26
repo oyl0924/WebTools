@@ -4,6 +4,7 @@ export interface Website {
   name: string
   url: string
   icon?: string
+  fullscreen?: boolean
   customButtons: CustomButton[]
 }
 

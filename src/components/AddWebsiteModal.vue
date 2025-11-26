@@ -4,11 +4,11 @@ import { message } from 'ant-design-vue'
 import type { Website } from '../types'
 
 interface Props {
-  visible: boolean
+  open: boolean
 }
 
 interface Emits {
-  (e: 'update:visible', value: boolean): void
+  (e: 'update:open', value: boolean): void
   (e: 'success'): void
 }
 
@@ -19,7 +19,8 @@ const formRef = ref()
 const formState = reactive({
   name: '',
   url: '',
-  icon: ''
+  icon: '',
+  fullscreen: false
 })
 
 const rules = {
@@ -34,7 +35,7 @@ const rules = {
 
 // 关闭弹窗
 const handleClose = () => {
-  emit('update:visible', false)
+  emit('update:open', false)
   resetForm()
 }
 
@@ -44,6 +45,7 @@ const resetForm = () => {
   formState.name = ''
   formState.url = ''
   formState.icon = ''
+  formState.fullscreen = false
 }
 
 // 提交表单
@@ -55,6 +57,7 @@ const handleSubmit = async () => {
       name: formState.name,
       url: formState.url,
       icon: formState.icon,
+      fullscreen: formState.fullscreen,
       customButtons: []
     }
 
@@ -82,7 +85,7 @@ const autoGetIcon = () => {
 
 <template>
   <a-modal
-    :visible="visible"
+    :open="open"
     title="添加网站"
     :width="600"
     @cancel="handleClose"
@@ -135,6 +138,11 @@ const autoGetIcon = () => {
           style="width: 48px; height: 48px; object-fit: contain;"
           @error="() => message.warning('图标加载失败')"
         />
+      </a-form-item>
+
+      <a-form-item label="全屏启动" name="fullscreen">
+        <a-switch v-model:checked="formState.fullscreen" />
+        <span style="margin-left: 8px; color: #999;">启用后窗口将以全屏模式打开</span>
       </a-form-item>
     </a-form>
   </a-modal>

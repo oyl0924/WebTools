@@ -45,19 +45,16 @@ const openAddModal = () => {
 const openEditModal = (website: Website) => {
   currentWebsite.value = website
   showEditModal.value = true
-  closeContextMenu()
 }
 
 // 打开自定义按钮弹窗
 const openCustomButtonModal = (website: Website) => {
   currentWebsite.value = website
   showCustomButtonModal.value = true
-  closeContextMenu()
 }
 
 // 删除网站
 const deleteWebsite = async (website: Website) => {
-  closeContextMenu()
   Modal.confirm({
     title: '确认删除',
     content: `确定要删除 "${website.name}" 吗？`,
@@ -83,7 +80,7 @@ const handleWebsiteClick = async (website: Website) => {
   } else {
     // 创建新窗口打开网站
     try {
-      await window.ipcRenderer.invoke('create-window', website.url)
+      await window.ipcRenderer.invoke('create-window', website.url, website.fullscreen || false)
     } catch (error) {
       message.error('打开网站失败')
       console.error(error)
@@ -120,10 +117,24 @@ const handleContextMenu = (e: MouseEvent, website: Website) => {
   contextMenuVisible.value = true
 }
 
+// 添加到桌面
+const addToDesktop = async (website: Website) => {
+  try {
+    await window.ipcRenderer.invoke('add-to-desktop', website)
+    message.success('添加到桌面成功')
+  } catch (error) {
+    message.error('添加到桌面失败')
+    console.error(error)
+  }
+}
+
 // 关闭右键菜单
-const closeContextMenu = () => {
-  contextMenuVisible.value = false
-  currentWebsite.value = null
+const closeContextMenu = (e?: Event) => {
+  // 如果点击的是菜单项，延迟关闭以确保菜单项的点击事件能正常触发
+  setTimeout(() => {
+    contextMenuVisible.value = false
+    currentWebsite.value = null
+  }, 100)
 }
 
 // 添加成功回调
@@ -209,29 +220,38 @@ onBeforeUnmount(() => {
 
     <!-- 右键菜单 -->
     <div
-      v-if="contextMenuVisible && currentWebsite"
+      v-show="contextMenuVisible && currentWebsite"
       class="context-menu"
       :style="{ left: contextMenuPosition.x + 'px', top: contextMenuPosition.y + 'px' }"
-      @click.stop
+      @mousedown.stop
     >
       <a-menu>
-        <a-menu-item @click="openEditModal(currentWebsite!)"><template #icon></template>编辑</a-menu-item>
-        <a-menu-item @click="openCustomButtonModal(currentWebsite!)"><template #icon></template>自定义按钮</a-menu-item>
+        <a-menu-item key="edit" @click="openEditModal(currentWebsite!); closeContextMenu()">
+          编辑
+        </a-menu-item>
+        <a-menu-item key="custom" @click="openCustomButtonModal(currentWebsite!); closeContextMenu()">
+          自定义按钮
+        </a-menu-item>
+        <a-menu-item key="desktop" @click="addToDesktop(currentWebsite!); closeContextMenu()">
+          添加到桌面
+        </a-menu-item>
         <a-menu-divider />
-        <a-menu-item danger @click="deleteWebsite(currentWebsite!)"><template #icon></template>删除</a-menu-item>
+        <a-menu-item key="delete" danger @click="deleteWebsite(currentWebsite!); closeContextMenu()">
+          删除
+        </a-menu-item>
       </a-menu>
     </div>
 
     <!-- 添加网站弹窗 -->
     <AddWebsiteModal
-      v-model:visible="showAddModal"
+      v-model:open="showAddModal"
       @success="handleAddSuccess"
     />
 
     <!-- 编辑网站弹窗 -->
     <EditWebsiteModal
       v-if="currentWebsite"
-      v-model:visible="showEditModal"
+      v-model:open="showEditModal"
       :website="currentWebsite"
       @success="handleEditSuccess"
     />
@@ -239,7 +259,7 @@ onBeforeUnmount(() => {
     <!-- 自定义按钮弹窗 -->
     <CustomButtonModal
       v-if="currentWebsite"
-      v-model:visible="showCustomButtonModal"
+      v-model:open="showCustomButtonModal"
       :website="currentWebsite"
       @success="handleCustomButtonSuccess"
     />

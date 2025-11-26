@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path$1 from "node:path";
@@ -123,7 +123,11 @@ function createWindow() {
   });
   win.webContents.on("before-input-event", (event, input) => {
     if (input.key === "F12") {
-      win == null ? void 0 : win.webContents.toggleDevTools();
+      if (win == null ? void 0 : win.webContents.isDevToolsOpened()) {
+        win.webContents.closeDevTools();
+      } else {
+        win == null ? void 0 : win.webContents.openDevTools();
+      }
       event.preventDefault();
     } else if (input.key === "F5") {
       win == null ? void 0 : win.webContents.reload();
@@ -139,10 +143,11 @@ function createWindow() {
     win.loadFile(path$1.join(RENDERER_DIST, "index.html"));
   }
 }
-function createChildWindow(url, windowId) {
+function createChildWindow(url, windowId, fullscreen = false) {
   const childWin = new BrowserWindow({
     width: 1e3,
     height: 700,
+    fullscreen,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path$1.join(__dirname$1, "preload.mjs"),
@@ -153,7 +158,11 @@ function createChildWindow(url, windowId) {
   });
   childWin.webContents.on("before-input-event", (event, input) => {
     if (input.key === "F12") {
-      childWin.webContents.toggleDevTools();
+      if (childWin.webContents.isDevToolsOpened()) {
+        childWin.webContents.closeDevTools();
+      } else {
+        childWin.webContents.openDevTools();
+      }
       event.preventDefault();
     } else if (input.key === "F5") {
       childWin.webContents.reload();
@@ -167,6 +176,8 @@ function createChildWindow(url, windowId) {
       hash: `/webview?url=${encodeURIComponent(url)}`
     });
   }
+  childWin.webContents.on("page-title-updated", (event, title) => {
+  });
   childWindows.set(windowId, childWin);
   childWin.on("closed", () => {
     childWindows.delete(windowId);
@@ -195,15 +206,37 @@ function setupIpcHandlers() {
   ipcMain.handle("delete-custom-button", (_event, websiteId, buttonId) => {
     return storageService.deleteCustomButton(websiteId, buttonId);
   });
-  ipcMain.handle("create-window", (_event, url) => {
+  ipcMain.handle("create-window", (_event, url, fullscreen = false) => {
     const windowId = Date.now().toString();
-    createChildWindow(url, windowId);
+    createChildWindow(url, windowId, fullscreen);
     return windowId;
   });
   ipcMain.handle("navigate-to-url", (_event, windowId, url) => {
     const childWin = childWindows.get(windowId);
     if (childWin) {
       childWin.webContents.loadURL(url);
+    }
+  });
+  ipcMain.handle("add-to-desktop", async (_event, website) => {
+    try {
+      const desktopPath = app.getPath("desktop");
+      const shortcutPath = path$1.join(desktopPath, `${website.name}.lnk`);
+      const exePath = process.execPath;
+      const success = shell.writeShortcutLink(shortcutPath, {
+        target: exePath,
+        args: `--website-url="${website.url}"`,
+        description: website.name,
+        icon: website.icon || exePath,
+        iconIndex: 0
+      });
+      if (success) {
+        return { success: true };
+      } else {
+        throw new Error("创建快捷方式失败");
+      }
+    } catch (error) {
+      console.error("添加到桌面失败:", error);
+      throw error;
     }
   });
 }
