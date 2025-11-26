@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, onBeforeUnmount } from 'vue'
-import { PlusOutlined, AppstoreAddOutlined } from '@ant-design/icons-vue'
+import { AppstoreAddOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import type { Website } from '../types'
 import AddWebsiteModal from './AddWebsiteModal.vue'
@@ -129,7 +129,7 @@ const addToDesktop = async (website: Website) => {
 }
 
 // 关闭右键菜单
-const closeContextMenu = (e?: Event) => {
+const closeContextMenu = () => {
   // 如果点击的是菜单项，延迟关闭以确保菜单项的点击事件能正常触发
   setTimeout(() => {
     contextMenuVisible.value = false

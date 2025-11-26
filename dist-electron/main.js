@@ -2,7 +2,6 @@ var __defProp = Object.defineProperty;
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 import { app, BrowserWindow, ipcMain, shell } from "electron";
-import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path$1 from "node:path";
 import fs from "fs";
@@ -99,7 +98,6 @@ class StorageService {
   }
 }
 const storageService = new StorageService();
-createRequire(import.meta.url);
 const __dirname$1 = path$1.dirname(fileURLToPath(import.meta.url));
 process.env.APP_ROOT = path$1.join(__dirname$1, "..");
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
@@ -176,7 +174,7 @@ function createChildWindow(url, windowId, fullscreen = false) {
       hash: `/webview?url=${encodeURIComponent(url)}`
     });
   }
-  childWin.webContents.on("page-title-updated", (event, title) => {
+  childWin.webContents.on("page-title-updated", () => {
   });
   childWindows.set(windowId, childWin);
   childWin.on("closed", () => {

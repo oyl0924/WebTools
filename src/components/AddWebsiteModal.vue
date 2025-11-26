@@ -85,7 +85,7 @@ const autoGetIcon = () => {
 
 <template>
   <a-modal
-    :open="open"
+    :open="props.open"
     title="添加网站"
     :width="600"
     @cancel="handleClose"

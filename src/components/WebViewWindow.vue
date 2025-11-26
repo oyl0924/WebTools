@@ -14,12 +14,6 @@ onMounted(() => {
   }
 })
 
-// 加载 URL
-const loadUrl = (url: string) => {
-  if (webviewRef.value) {
-    webviewRef.value.loadURL(url)
-  }
-}
 </script>
 
 <template>

@@ -1,11 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
-import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import fs from 'fs'
 import storageService from './storage'
-
-const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // The built directory structure
@@ -110,7 +106,7 @@ function createChildWindow(url: string, windowId: string, fullscreen: boolean = 
   }
 
   // 等待页面加载后更新标题
-  childWin.webContents.on('page-title-updated', (event, title) => {
+  childWin.webContents.on('page-title-updated', () => {
     // 不阻止默认行为，让窗口显示网页自己的 title
   })
 
