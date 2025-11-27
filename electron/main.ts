@@ -5,6 +5,7 @@ import fs from 'node:fs'
 import https from 'node:https'
 import http from 'node:http'
 import storageService from './storage'
+import { settingsService } from './services/settingsService'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // The built directory structure
@@ -37,24 +38,25 @@ function getIconsDir() {
   return iconsDir
 }
 
-// 下载图标到本地
+// 下载图标到本地（优化版本）
 async function downloadIcon(iconUrl: string, websiteId: string): Promise<string | null> {
   return new Promise((resolve) => {
     try {
       const iconsDir = getIconsDir()
       const ext = path.extname(new URL(iconUrl).pathname) || '.ico'
       const iconPath = path.join(iconsDir, `${websiteId}${ext}`)
-      
+
       // 如果图标已存在，直接返回
       if (fs.existsSync(iconPath)) {
         resolve(iconPath)
         return
       }
-      
+
       const file = fs.createWriteStream(iconPath)
       const protocol = iconUrl.startsWith('https') ? https : http
-      
-      const request = protocol.get(iconUrl, (response) => {
+
+      // 设置更短的超时时间（3秒）
+      const request = protocol.get(iconUrl, { timeout: 3000 }, (response) => {
         // 处理重定向
         if (response.statusCode === 301 || response.statusCode === 302) {
           const redirectUrl = response.headers.location
@@ -65,22 +67,22 @@ async function downloadIcon(iconUrl: string, websiteId: string): Promise<string 
             return
           }
         }
-        
+
         if (response.statusCode !== 200) {
           file.close()
           fs.unlinkSync(iconPath)
           resolve(null)
           return
         }
-        
+
         response.pipe(file)
-        
+
         file.on('finish', () => {
           file.close()
           resolve(iconPath)
         })
       })
-      
+
       request.on('error', () => {
         file.close()
         if (fs.existsSync(iconPath)) {
@@ -88,8 +90,8 @@ async function downloadIcon(iconUrl: string, websiteId: string): Promise<string 
         }
         resolve(null)
       })
-      
-      request.setTimeout(10000, () => {
+
+      request.on('timeout', () => {
         request.destroy()
         file.close()
         if (fs.existsSync(iconPath)) {
@@ -104,12 +106,16 @@ async function downloadIcon(iconUrl: string, websiteId: string): Promise<string 
   })
 }
 
-function createWindow() {
+async function createWindow() {
+  // 获取设置
+  const savedSettings = settingsService.getSettings()
+
   win = new BrowserWindow({
     width: 1200,
     height: 800,
     icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
     autoHideMenuBar: true,
+    show: false, // 先不显示，等设置好大小后再显示
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       webviewTag: true,
@@ -118,8 +124,24 @@ function createWindow() {
     },
   })
 
+  // 根据设置调整窗口大小
+  if (savedSettings.homeWindowSize === 'maximized') {
+    win.maximize()
+  } else if (savedSettings.homeWindowSize === 'fullscreen') {
+    win.setFullScreen(true)
+  }
+
+  // 显示窗口
+  win.show()
+
   // 设置快捷键
   win.webContents.on('before-input-event', (event, input) => {
+    // 阻止Alt键显示菜单栏
+    if (input.key === 'Alt') {
+      event.preventDefault()
+      return
+    }
+
     if (input.key === 'F12') {
       if (win?.webContents.isDevToolsOpened()) {
         win.webContents.closeDevTools()
@@ -147,7 +169,7 @@ function createWindow() {
 }
 
 // 创建子窗口
-function createChildWindow(url: string, windowId: string, windowMode: 'normal' | 'maximized' | 'fullscreen' | boolean = 'maximized', websiteName?: string) {
+async function createChildWindow(url: string, windowId: string, windowMode: 'normal' | 'maximized' | 'fullscreen' | boolean = 'maximized', websiteName?: string) {
   // 兼容旧的 boolean 类型（fullscreen 参数）
   let mode: 'normal' | 'maximized' | 'fullscreen'
   if (typeof windowMode === 'boolean') {
@@ -262,9 +284,9 @@ function setupIpcHandlers() {
   })
 
   // 创建新窗口
-  ipcMain.handle('create-window', (_event, url, windowMode: 'normal' | 'maximized' | 'fullscreen' | boolean = 'maximized', websiteName?: string) => {
+  ipcMain.handle('create-window', async (_event, url, windowMode: 'normal' | 'maximized' | 'fullscreen' | boolean = 'maximized', websiteName?: string) => {
     const windowId = Date.now().toString()
-    createChildWindow(url, windowId, windowMode, websiteName)
+    await createChildWindow(url, windowId, windowMode, websiteName)
     return windowId
   })
 
@@ -276,24 +298,52 @@ function setupIpcHandlers() {
     }
   })
 
-  // 添加到桌面
+  // 添加到桌面（优化版本）
   ipcMain.handle('add-to-desktop', async (_event, websiteData) => {
     try {
       const desktopPath = app.getPath('desktop')
       const shortcutPath = path.join(desktopPath, `${websiteData.name}.lnk`)
-      
+
       // 获取当前应用程序的路径
       const exePath = process.execPath
-      
-      // 尝试下载网站图标
+
+      // 图标获取策略优化
       let iconPath = exePath
-      if (websiteData.icon) {
-        const downloadedIcon = await downloadIcon(websiteData.icon, websiteData.id || Date.now().toString())
-        if (downloadedIcon) {
-          iconPath = downloadedIcon
+
+      // 1. 首先尝试使用网站的favicon.ico
+      if (websiteData.icon && websiteData.icon.includes('favicon.ico')) {
+        try {
+          const faviconPath = await downloadIcon(websiteData.icon, websiteData.id || Date.now().toString())
+          if (faviconPath) {
+            iconPath = faviconPath
+          }
+        } catch (err) {
+          console.log('favicon.ico下载失败，尝试备用方案')
         }
       }
-      
+
+      // 2. 如果favicon失败，尝试从网站根目录获取
+      if (iconPath === exePath && websiteData.url) {
+        try {
+          const urlObj = new URL(websiteData.url)
+          const rootFaviconUrl = `${urlObj.origin}/favicon.ico`
+          const rootFaviconPath = await downloadIcon(rootFaviconUrl, `root_${websiteData.id || Date.now().toString()}`)
+          if (rootFaviconPath) {
+            iconPath = rootFaviconPath
+          }
+        } catch (err) {
+          console.log('根目录favicon获取失败')
+        }
+      }
+
+      // 3. 如果都失败，使用应用图标，但确保图标存在
+      if (iconPath === exePath) {
+        const appIconPath = path.join(process.env.VITE_PUBLIC || __dirname, 'icon.ico')
+        if (fs.existsSync(appIconPath)) {
+          iconPath = appIconPath
+        }
+      }
+
       // 创建快捷方式，传递 URL 和网站名称
       const success = shell.writeShortcutLink(shortcutPath, {
         target: exePath,
@@ -302,9 +352,9 @@ function setupIpcHandlers() {
         icon: iconPath,
         iconIndex: 0
       })
-      
+
       if (success) {
-        return { success: true }
+        return { success: true, iconPath: iconPath }
       } else {
         throw new Error('创建快捷方式失败')
       }
@@ -312,6 +362,28 @@ function setupIpcHandlers() {
       console.error('添加到桌面失败:', error)
       throw error
     }
+  })
+
+  // 获取设置
+  ipcMain.handle('get-settings', () => {
+    return settingsService.getSettings()
+  })
+
+  // 保存设置
+  ipcMain.handle('save-settings', (_event, settings) => {
+    const updatedSettings = settingsService.updateSettings(settings)
+
+    // 设置开机启动
+    if (settings.autoStart !== undefined) {
+      settingsService.setAutoStart(settings.autoStart).catch(console.error)
+    }
+
+    return updatedSettings
+  })
+
+  // 获取开机启动状态
+  ipcMain.handle('get-auto-start-status', () => {
+    return settingsService.getAutoStartStatus()
   })
 }
 
@@ -329,7 +401,7 @@ app.on('activate', () => {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow()
+    createWindow().catch(console.error)
   }
 })
 
@@ -345,10 +417,10 @@ app.whenReady().then(() => {
     const url = websiteUrlArg.split('=')[1].replace(/"/g, '')
     const websiteName = websiteNameArg ? websiteNameArg.split('=')[1].replace(/"/g, '') : undefined
     const windowId = Date.now().toString()
-    createChildWindow(url, windowId, 'maximized', websiteName)
+    createChildWindow(url, windowId, 'maximized', websiteName).catch(console.error)
   } else {
     // 正常启动，打开主窗口
-    createWindow()
+    createWindow().catch(console.error)
   }
 })
 
@@ -357,13 +429,13 @@ app.on('second-instance', (_event, commandLine) => {
   // 检查第二个实例的命令行参数
   const websiteUrlArg = commandLine.find(arg => arg.startsWith('--website-url='))
   const websiteNameArg = commandLine.find(arg => arg.startsWith('--website-name='))
-  
+
   if (websiteUrlArg) {
     // 打开新的网站窗口
     const url = websiteUrlArg.split('=')[1].replace(/"/g, '')
     const websiteName = websiteNameArg ? websiteNameArg.split('=')[1].replace(/"/g, '') : undefined
     const windowId = Date.now().toString()
-    createChildWindow(url, windowId, 'maximized', websiteName)
+    createChildWindow(url, windowId, 'maximized', websiteName).catch(console.error)
   } else if (win) {
     // 如果是正常启动，聘焦主窗口
     if (win.isMinimized()) win.restore()

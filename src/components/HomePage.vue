@@ -1,15 +1,21 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { AppstoreAddOutlined, SettingOutlined } from '@ant-design/icons-vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
+import { AppstoreAddOutlined, SettingOutlined, ControlOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import type { Website } from '../types'
 import AddWebsiteModal from './AddWebsiteModal.vue'
 import ManageModal from './ManageModal.vue'
+import SettingsModal from './SettingsModal.vue'
+import EditWebsiteModal from './EditWebsiteModal.vue'
 
 const searchText = ref('')
 const websites = ref<Website[]>([])
 const showAddModal = ref(false)
 const showManageModal = ref(false)
+const showSettingsModal = ref(false)
+const showEditModal = ref(false)
+const searchInputRef = ref<HTMLInputElement>()
+const currentWebsite = ref<Website | null>(null)
 
 // 过滤后的网站列表
 const filteredWebsites = computed(() => {
@@ -39,6 +45,73 @@ const openAddModal = () => {
 // 打开管理弹窗
 const openManageModal = () => {
   showManageModal.value = true
+}
+
+// 打开设置弹窗
+const openSettingsModal = () => {
+  showSettingsModal.value = true
+}
+
+// 设置变化处理
+const handleSettingsChanged = (settings: any) => {
+  // 处理设置变化，如应用主题等
+  console.log('设置已更新:', settings)
+
+  // 应用黑暗模式
+  applyDarkMode(settings)
+}
+
+// 应用黑暗模式
+const applyDarkMode = (settings: any) => {
+  nextTick(() => {
+    const isDark = checkShouldUseDarkMode(settings)
+    if (isDark) {
+      document.documentElement.classList.add('dark')
+      document.documentElement.setAttribute('data-theme', 'dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      document.documentElement.removeAttribute('data-theme')
+    }
+  })
+}
+
+// 检测是否应该使用黑暗模式
+const checkShouldUseDarkMode = (settings: any): boolean => {
+  if (settings.darkMode === 'manual') {
+    return settings.isDarkMode
+  } else if (settings.darkMode === 'system') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+  } else if (settings.darkMode === 'time') {
+    const now = new Date()
+    const currentTime = now.getHours() * 60 + now.getMinutes()
+    const [startHour, startMin] = settings.darkModeTimeStart.split(':').map(Number)
+    const [endHour, endMin] = settings.darkModeTimeEnd.split(':').map(Number)
+    const startTime = startHour * 60 + startMin
+    const endTime = endHour * 60 + endMin
+
+    if (startTime <= endTime) {
+      return currentTime >= startTime && currentTime <= endTime
+    } else {
+      return currentTime >= startTime || currentTime <= endTime
+    }
+  }
+  return false
+}
+
+// 右键编辑网站
+const handleWebsiteRightClick = (website: Website, event: MouseEvent) => {
+  event.preventDefault()
+  if (website.id !== 'add') {
+    currentWebsite.value = website
+    showEditModal.value = true
+  }
+}
+
+// 编辑成功回调
+const handleEditSuccess = async () => {
+  showEditModal.value = false
+  currentWebsite.value = null
+  await loadWebsites()
 }
 
 // 点击网站卡片
@@ -91,24 +164,50 @@ const handleManageSuccess = async () => {
 
 onMounted(() => {
   loadWebsites()
+  // 自动聚焦到搜索框
+  nextTick(() => {
+    searchInputRef.value?.focus()
+  })
+
+  // 加载设置并应用黑暗模式
+  loadSettingsAndApplyTheme()
 })
+
+// 加载设置并应用主题
+const loadSettingsAndApplyTheme = async () => {
+  try {
+    const settings = await window.ipcRenderer.invoke('get-settings')
+    if (settings) {
+      applyDarkMode(settings)
+    }
+  } catch (error) {
+    console.error('加载设置失败:', error)
+  }
+}
 </script>
 
 <template>
   <div class="home-page">
     <!-- 管理按钮 -->
-    <div class="manage-button-wrapper">
+    <div class="header-buttons">
       <a-button type="primary" size="large" @click="openManageModal">
         <template #icon>
           <SettingOutlined />
         </template>
         管理
       </a-button>
+      <a-button size="large" @click="openSettingsModal">
+        <template #icon>
+          <ControlOutlined />
+        </template>
+        设置
+      </a-button>
     </div>
 
     <!-- 搜索框 -->
     <div class="search-bar">
       <a-input-search
+        ref="searchInputRef"
         v-model:value="searchText"
         placeholder="搜索网站..."
         size="large"
@@ -124,6 +223,7 @@ onMounted(() => {
         :key="website.id"
         class="website-card"
         @click="handleWebsiteClick(website)"
+        @contextmenu="handleWebsiteRightClick(website, $event)"
       >
         <div class="website-icon">
           <img v-if="website.icon" :src="website.icon" alt="" />
@@ -167,6 +267,20 @@ onMounted(() => {
       v-model:open="showManageModal"
       @success="handleManageSuccess"
     />
+
+    <!-- 设置弹窗 -->
+    <SettingsModal
+      v-model:open="showSettingsModal"
+      @settings-changed="handleSettingsChanged"
+    />
+
+    <!-- 编辑网站弹窗 -->
+    <EditWebsiteModal
+      v-if="currentWebsite"
+      v-model:open="showEditModal"
+      :website="currentWebsite"
+      @success="handleEditSuccess"
+    />
   </div>
 </template>
 
@@ -178,11 +292,13 @@ onMounted(() => {
   position: relative;
 }
 
-.manage-button-wrapper {
+.header-buttons {
   position: absolute;
   top: 20px;
   right: 40px;
   z-index: 10;
+  display: flex;
+  gap: 12px;
 }
 
 .search-bar {

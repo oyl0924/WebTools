@@ -139,15 +139,22 @@ const handleSelectionChange = (selectedKeys: string[], selectedRows: Website[]) 
 
 // 添加到桌面
 const addToDesktop = async (website: Website) => {
+  const hideLoading = message.loading('正在创建桌面快捷方式...', 0)
   try {
-    await window.ipcRenderer.invoke('add-to-desktop', {
+    const result = await window.ipcRenderer.invoke('add-to-desktop', {
       id: website.id,
       name: website.name,
       url: website.url,
       icon: website.icon
     })
-    message.success('添加到桌面成功')
+    hideLoading()
+    if (result && result.success) {
+      message.success('添加到桌面成功')
+    } else {
+      message.error('添加到桌面失败')
+    }
   } catch (error) {
+    hideLoading()
     message.error('添加到桌面失败')
     console.error(error)
   }

@@ -1,0 +1,174 @@
+/* 黑暗模式主题样式 */
+
+/* 基础黑暗模式背景 */
+.dark body {
+  background-color: #141414 !important;
+  color: #ffffff;
+}
+
+/* 首页黑暗模式 */
+.dark .home-page {
+  background-color: #141414;
+  color: #ffffff;
+}
+
+.dark .website-card {
+  background-color: #1f1f1f;
+  border: 1px solid #303030;
+}
+
+.dark .website-card:hover {
+  background-color: #262626;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.dark .website-name {
+  color: #ffffff;
+}
+
+.dark .add-card {
+  border-color: #434343;
+  background-color: #1a1a1a;
+}
+
+.dark .add-card:hover {
+  border-color: #1890ff;
+  background-color: #001d3d;
+}
+
+/* 搜索框黑暗模式 */
+.dark .search-bar .ant-input-search {
+  background-color: #1f1f1f;
+  border-color: #434343;
+}
+
+.dark .search-bar .ant-input-search:hover {
+  border-color: #1890ff;
+}
+
+.dark .search-bar .ant-input {
+  background-color: #1f1f1f;
+  color: #ffffff;
+}
+
+.dark .search-bar .ant-input::placeholder {
+  color: #8c8c8c;
+}
+
+/* 按钮黑暗模式 */
+.dark .header-buttons .ant-btn {
+  background-color: #1f1f1f;
+  border-color: #434343;
+  color: #ffffff;
+}
+
+.dark .header-buttons .ant-btn:hover {
+  background-color: #262626;
+  border-color: #1890ff;
+}
+
+.dark .header-buttons .ant-btn-primary {
+  background-color: #1890ff;
+  border-color: #1890ff;
+}
+
+.dark .header-buttons .ant-btn-primary:hover {
+  background-color: #40a9ff;
+  border-color: #40a9ff;
+}
+
+/* 管理页面黑暗模式 */
+.dark .manage-content {
+  background-color: #1f1f1f;
+}
+
+.dark .ant-table {
+  background-color: #1f1f1f;
+  color: #ffffff;
+}
+
+.dark .ant-table-thead > tr > th {
+  background-color: #141414;
+  color: #ffffff;
+  border-bottom-color: #303030;
+}
+
+.dark .ant-table-tbody > tr > td {
+  border-bottom-color: #303030;
+}
+
+.dark .ant-table-tbody > tr:hover > td {
+  background-color: #262626;
+}
+
+/* 设置页面黑暗模式 */
+.dark .settings-content {
+  background-color: #1f1f1f;
+  color: #ffffff;
+}
+
+.dark .setting-item h3 {
+  color: #ffffff;
+}
+
+.dark .switch-label {
+  color: #d9d9d9;
+}
+
+/* 弹窗黑暗模式 */
+.dark .ant-modal-content {
+  background-color: #1f1f1f;
+  color: #ffffff;
+}
+
+.dark .ant-modal-header {
+  background-color: #1f1f1f;
+  color: #ffffff;
+  border-bottom-color: #303030;
+}
+
+.dark .ant-form-item-label > label {
+  color: #ffffff;
+}
+
+.dark .ant-input {
+  background-color: #141414;
+  border-color: #434343;
+  color: #ffffff;
+}
+
+.dark .ant-input:hover {
+  border-color: #1890ff;
+}
+
+.dark .ant-input:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.dark .ant-radio-wrapper {
+  color: #ffffff;
+}
+
+/* 时间选择器黑暗模式 */
+.dark .ant-picker {
+  background-color: #141414;
+  border-color: #434343;
+}
+
+.dark .ant-picker-input > input {
+  background-color: transparent;
+  color: #ffffff;
+}
+
+.dark .ant-picker-panel {
+  background-color: #1f1f1f;
+}
+
+.dark .ant-picker-time-panel-column > li.ant-picker-time-panel-cell .ant-picker-time-panel-cell-inner {
+  color: #ffffff;
+}
+
+.dark .ant-picker-time-panel-column > li.ant-picker-time-panel-cell-selected .ant-picker-time-panel-cell-inner {
+  background-color: #1890ff;
+}

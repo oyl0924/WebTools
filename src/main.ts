@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import './style.css'
+import './styles/dark-theme.css'
 import App from './App.vue'
 import router from './router'
 import Antd from 'ant-design-vue'

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import { DesktopOutlined } from '@ant-design/icons-vue'
 import type { Website } from '../types'
 
 interface Props {
@@ -86,6 +87,29 @@ const autoGetIcon = () => {
     }
   }
 }
+
+// 添加到桌面
+const addToDesktop = async () => {
+  const hideLoading = message.loading('正在创建桌面快捷方式...', 0)
+  try {
+    const result = await window.ipcRenderer.invoke('add-to-desktop', {
+      id: props.website.id,
+      name: formState.name,
+      url: formState.url,
+      icon: formState.icon
+    })
+    hideLoading()
+    if (result && result.success) {
+      message.success('添加到桌面成功')
+    } else {
+      message.error('添加到桌面失败')
+    }
+  } catch (error) {
+    hideLoading()
+    message.error('添加到桌面失败')
+    console.error(error)
+  }
+}
 </script>
 
 <template>
@@ -96,6 +120,16 @@ const autoGetIcon = () => {
     @cancel="handleClose"
     @ok="handleSubmit"
   >
+    <template #footer>
+      <a-button @click="addToDesktop">
+        <template #icon>
+          <DesktopOutlined />
+        </template>
+        添加到桌面
+      </a-button>
+      <a-button @click="handleClose">取消</a-button>
+      <a-button type="primary" @click="handleSubmit">确定</a-button>
+    </template>
     <a-form
       ref="formRef"
       :model="formState"

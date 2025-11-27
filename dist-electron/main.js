@@ -101,6 +101,98 @@ class StorageService {
   }
 }
 const storageService = new StorageService();
+const DEFAULT_SETTINGS = {
+  darkMode: "manual",
+  darkModeTimeStart: "18:00",
+  darkModeTimeEnd: "06:00",
+  isDarkMode: false,
+  homeWindowSize: "maximized",
+  autoStart: false
+};
+class SettingsService {
+  constructor() {
+    __publicField(this, "settingsPath");
+    __publicField(this, "settings");
+    this.settingsPath = path.join(app.getPath("userData"), "settings.json");
+    this.settings = this.loadSettings();
+  }
+  loadSettings() {
+    try {
+      if (fs.existsSync(this.settingsPath)) {
+        const data = fs.readFileSync(this.settingsPath, "utf-8");
+        const parsed = JSON.parse(data);
+        return { ...DEFAULT_SETTINGS, ...parsed };
+      }
+    } catch (error) {
+      console.error("加载设置失败:", error);
+    }
+    return { ...DEFAULT_SETTINGS };
+  }
+  saveSettings() {
+    try {
+      const data = JSON.stringify(this.settings, null, 2);
+      fs.writeFileSync(this.settingsPath, data, "utf-8");
+    } catch (error) {
+      console.error("保存设置失败:", error);
+    }
+  }
+  getSettings() {
+    return { ...this.settings };
+  }
+  updateSettings(newSettings) {
+    this.settings = { ...this.settings, ...newSettings };
+    this.saveSettings();
+    return this.settings;
+  }
+  // 检测是否应该使用黑暗模式
+  shouldUseDarkMode() {
+    const { darkMode, darkModeTimeStart, darkModeTimeEnd, isDarkMode } = this.settings;
+    if (darkMode === "manual") {
+      return isDarkMode;
+    } else if (darkMode === "system") {
+      return false;
+    } else if (darkMode === "time") {
+      const now = /* @__PURE__ */ new Date();
+      const currentTime = now.getHours() * 60 + now.getMinutes();
+      const [startHour, startMin] = darkModeTimeStart.split(":").map(Number);
+      const [endHour, endMin] = darkModeTimeEnd.split(":").map(Number);
+      const startTime = startHour * 60 + startMin;
+      const endTime = endHour * 60 + endMin;
+      if (startTime <= endTime) {
+        return currentTime >= startTime && currentTime <= endTime;
+      } else {
+        return currentTime >= startTime || currentTime <= endTime;
+      }
+    }
+    return false;
+  }
+  // 设置开机启动
+  async setAutoStart(enabled) {
+    try {
+      const { app: app2 } = await import("electron");
+      app2.setLoginItemSettings({
+        openAtLogin: enabled,
+        openAsHidden: false
+      });
+      this.updateSettings({ autoStart: enabled });
+    } catch (error) {
+      console.error("设置开机启动失败:", error);
+      throw error;
+    }
+  }
+  // 获取开机启动状态
+  getAutoStartStatus() {
+    try {
+      const app2 = require("electron").app;
+      const loginSettings = app2.getLoginItemSettings();
+      return loginSettings.openAtLogin;
+    } catch (error) {
+      console.error("获取开机启动状态失败:", error);
+      return false;
+    }
+  }
+}
+const settingsService = new SettingsService();
 const __dirname$1 = path$1.dirname(fileURLToPath(import.meta.url));
 process.env.APP_ROOT = path$1.join(__dirname$1, "..");
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
@@ -128,7 +220,7 @@ async function downloadIcon(iconUrl, websiteId) {
       }
       const file = fs$1.createWriteStream(iconPath);
       const protocol = iconUrl.startsWith("https") ? https : http;
-      const request = protocol.get(iconUrl, (response) => {
+      const request = protocol.get(iconUrl, { timeout: 3e3 }, (response) => {
         if (response.statusCode === 301 || response.statusCode === 302) {
           const redirectUrl = response.headers.location;
           if (redirectUrl) {
@@ -157,7 +249,7 @@ async function downloadIcon(iconUrl, websiteId) {
         }
         resolve(null);
       });
-      request.setTimeout(1e4, () => {
+      request.on("timeout", () => {
         request.destroy();
         file.close();
         if (fs$1.existsSync(iconPath)) {
@@ -171,12 +263,15 @@ async function downloadIcon(iconUrl, websiteId) {
     }
   });
 }
-function createWindow() {
+async function createWindow() {
+  const savedSettings = settingsService.getSettings();
   win = new BrowserWindow({
     width: 1200,
     height: 800,
     icon: path$1.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
     autoHideMenuBar: true,
+    show: false,
+    // 先不显示，等设置好大小后再显示
     webPreferences: {
       preload: path$1.join(__dirname$1, "preload.mjs"),
       webviewTag: true,
@@ -184,7 +279,17 @@ function createWindow() {
       nodeIntegration: false
     }
   });
+  if (savedSettings.homeWindowSize === "maximized") {
+    win.maximize();
+  } else if (savedSettings.homeWindowSize === "fullscreen") {
+    win.setFullScreen(true);
+  }
+  win.show();
   win.webContents.on("before-input-event", (event, input) => {
+    if (input.key === "Alt") {
+      event.preventDefault();
+      return;
+    }
     if (input.key === "F12") {
       if (win == null ? void 0 : win.webContents.isDevToolsOpened()) {
         win.webContents.closeDevTools();
@@ -206,7 +311,7 @@ function createWindow() {
     win.loadFile(path$1.join(RENDERER_DIST, "index.html"));
   }
 }
-function createChildWindow(url, windowId, windowMode = "maximized", websiteName) {
+async function createChildWindow(url, windowId, windowMode = "maximized", websiteName) {
   let mode;
   if (typeof windowMode === "boolean") {
     mode = windowMode ? "fullscreen" : "maximized";
@@ -284,9 +389,9 @@ function setupIpcHandlers() {
   ipcMain.handle("delete-custom-button", (_event, websiteId, buttonId) => {
     return storageService.deleteCustomButton(websiteId, buttonId);
   });
-  ipcMain.handle("create-window", (_event, url, windowMode = "maximized", websiteName) => {
+  ipcMain.handle("create-window", async (_event, url, windowMode = "maximized", websiteName) => {
     const windowId = Date.now().toString();
-    createChildWindow(url, windowId, windowMode, websiteName);
+    await createChildWindow(url, windowId, windowMode, websiteName);
     return windowId;
   });
   ipcMain.handle("navigate-to-url", (_event, windowId, url) => {
@@ -301,10 +406,32 @@ function setupIpcHandlers() {
       const shortcutPath = path$1.join(desktopPath, `${websiteData.name}.lnk`);
       const exePath = process.execPath;
       let iconPath = exePath;
-      if (websiteData.icon) {
-        const downloadedIcon = await downloadIcon(websiteData.icon, websiteData.id || Date.now().toString());
-        if (downloadedIcon) {
-          iconPath = downloadedIcon;
+      if (websiteData.icon && websiteData.icon.includes("favicon.ico")) {
+        try {
+          const faviconPath = await downloadIcon(websiteData.icon, websiteData.id || Date.now().toString());
+          if (faviconPath) {
+            iconPath = faviconPath;
+          }
+        } catch (err) {
+          console.log("favicon.ico下载失败，尝试备用方案");
+        }
+      }
+      if (iconPath === exePath && websiteData.url) {
+        try {
+          const urlObj = new URL(websiteData.url);
+          const rootFaviconUrl = `${urlObj.origin}/favicon.ico`;
+          const rootFaviconPath = await downloadIcon(rootFaviconUrl, `root_${websiteData.id || Date.now().toString()}`);
+          if (rootFaviconPath) {
+            iconPath = rootFaviconPath;
+          }
+        } catch (err) {
+          console.log("根目录favicon获取失败");
+        }
+      }
+      if (iconPath === exePath) {
+        const appIconPath = path$1.join(process.env.VITE_PUBLIC || __dirname$1, "icon.ico");
+        if (fs$1.existsSync(appIconPath)) {
+          iconPath = appIconPath;
         }
       }
       const success = shell.writeShortcutLink(shortcutPath, {
@@ -315,7 +442,7 @@ function setupIpcHandlers() {
         iconIndex: 0
       });
       if (success) {
-        return { success: true };
+        return { success: true, iconPath };
       } else {
         throw new Error("创建快捷方式失败");
       }
@@ -323,6 +450,19 @@ function setupIpcHandlers() {
       console.error("添加到桌面失败:", error);
       throw error;
     }
+  });
+  ipcMain.handle("get-settings", () => {
+    return settingsService.getSettings();
+  });
+  ipcMain.handle("save-settings", (_event, settings) => {
+    const updatedSettings = settingsService.updateSettings(settings);
+    if (settings.autoStart !== void 0) {
+      settingsService.setAutoStart(settings.autoStart).catch(console.error);
+    }
+    return updatedSettings;
+  });
+  ipcMain.handle("get-auto-start-status", () => {
+    return settingsService.getAutoStartStatus();
   });
 }
 app.on("window-all-closed", () => {
@@ -333,7 +473,7 @@ app.on("window-all-closed", () => {
 });
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
+    createWindow().catch(console.error);
   }
 });
 app.whenReady().then(() => {
@@ -344,9 +484,9 @@ app.whenReady().then(() => {
     const url = websiteUrlArg.split("=")[1].replace(/"/g, "");
     const websiteName = websiteNameArg ? websiteNameArg.split("=")[1].replace(/"/g, "") : void 0;
     const windowId = Date.now().toString();
-    createChildWindow(url, windowId, "maximized", websiteName);
+    createChildWindow(url, windowId, "maximized", websiteName).catch(console.error);
   } else {
-    createWindow();
+    createWindow().catch(console.error);
   }
 });
 app.on("second-instance", (_event, commandLine) => {
@@ -356,7 +496,7 @@ app.on("second-instance", (_event, commandLine) => {
     const url = websiteUrlArg.split("=")[1].replace(/"/g, "");
     const websiteName = websiteNameArg ? websiteNameArg.split("=")[1].replace(/"/g, "") : void 0;
     const windowId = Date.now().toString();
-    createChildWindow(url, windowId, "maximized", websiteName);
+    createChildWindow(url, windowId, "maximized", websiteName).catch(console.error);
   } else if (win) {
     if (win.isMinimized()) win.restore();
     win.focus();
