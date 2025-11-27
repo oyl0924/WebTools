@@ -236,27 +236,445 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
     }
   })
 
-  // 直接加载网站 URL，不通过 webview，提高性能
-  childWin.loadURL(url)
+  // 加载包含功能栏的HTML页面
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>${websiteName || 'WebTools'}</title>
+        <style>
+          body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+          }
+          .toolbar {
+            height: 42px;
+            background: #f0f2f5;
+            border-bottom: 1px solid #d9d9d9;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            gap: 12px;
+            flex-shrink: 0;
+          }
+          .toolbar-section {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+          .toolbar-section-1 {
+            flex: 1;
+            min-width: 0;
+          }
+          .toolbar-section-2 {
+            flex: 2;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+          }
+          .toolbar-section-3 {
+            flex: 1;
+            justify-content: flex-end;
+          }
+          .custom-buttons {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            padding: 4px 0;
+          }
+          /* Ant Design Vue 按钮样式 */
+          .ant-btn {
+            position: relative;
+            display: inline-block;
+            font-weight: 400;
+            white-space: nowrap;
+            text-align: center;
+            background-image: none;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
+            user-select: none;
+            touch-action: manipulation;
+            height: 32px;
+            padding: 4px 15px;
+            font-size: 14px;
+            border-radius: 6px;
+            outline: 0;
+            line-height: 1.5714285714285714;
+            box-shadow: 0 2px 0 rgba(0, 0, 0, 0.015);
+          }
+          .ant-btn:hover, .ant-btn:focus {
+            color: #40a9ff;
+            border-color: #40a9ff;
+          }
+          .ant-btn:active {
+            color: #096dd9;
+            border-color: #096dd9;
+          }
+          /* 主要按钮 */
+          .ant-btn-primary {
+            color: #fff;
+            background: #1890ff;
+            border-color: #1890ff;
+            text-shadow: 0 -1px 0 rgba(0,0,0,0.12);
+            box-shadow: 0 2px #0000000b;
+          }
+          .ant-btn-primary:hover, .ant-btn-primary:focus {
+            color: #fff;
+            background: #40a9ff;
+            border-color: #40a9ff;
+          }
+          .ant-btn-primary:active {
+            color: #fff;
+            background: #096dd9;
+            border-color: #096dd9;
+          }
+          /* 成功按钮 */
+          .ant-btn-success {
+            color: #fff;
+            background: #52c41a;
+            border-color: #52c41a;
+            text-shadow: 0 -1px 0 rgba(0,0,0,0.12);
+            box-shadow: 0 2px #0000000b;
+          }
+          .ant-btn-success:hover, .ant-btn-success:focus {
+            color: #fff;
+            background: #73d13d;
+            border-color: #73d13d;
+          }
+          .ant-btn-success:active {
+            color: #fff;
+            background: #389e0d;
+            border-color: #389e0d;
+          }
+          /* 默认按钮 */
+          .ant-btn-default {
+            color: rgba(0, 0, 0, 0.88);
+            background: #ffffff;
+            border-color: #d9d9d9;
+          }
+          .ant-btn-default:hover, .ant-btn-default:focus {
+            color: #40a9ff;
+            border-color: #40a9ff;
+          }
+          .ant-btn-default:active {
+            color: #096dd9;
+            border-color: #096dd9;
+          }
+          /* 自定义按钮样式 */
+          .custom-button {
+            composes: ant-btn ant-btn-primary;
+            font-size: 12px;
+            padding: 2px 8px;
+            height: 24px;
+            line-height: 1.2;
+          }
+          .add-button {
+            composes: ant-btn ant-btn-success;
+            font-size: 12px;
+            padding: 2px 8px;
+            height: 24px;
+            line-height: 1.2;
+          }
+          .tool-button {
+            composes: ant-btn ant-btn-default;
+            font-size: 12px;
+            padding: 2px 8px;
+            height: 24px;
+            line-height: 1.2;
+          }
+          /* 导航按钮样式 */
+          .url-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: white;
+            border: 1px solid #d9d9d9;
+            border-radius: 6px;
+            padding: 0;
+            min-height: 32px;
+            overflow: hidden;
+          }
+          .url-display {
+            flex: 1;
+            padding: 6px 10px;
+            font-size: 12px;
+            color: rgba(0, 0, 0, 0.88);
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            text-align: left;
+          }
+          .nav-buttons {
+            display: flex;
+            gap: 0;
+            border-left: 1px solid #d9d9d9;
+          }
+          .nav-button {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
+          }
+          .nav-button:hover {
+            background: #f5f5f5;
+          }
+          .nav-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+          .tool-buttons {
+            display: flex;
+            gap: 6px;
+          }
+          .webview-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+          }
+          webview {
+            width: 100%;
+            height: 100%;
+            border: none;
+          }
+          .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="app-container">
+          <div class="toolbar">
+            <div class="toolbar-section toolbar-section-1">
+              <div class="custom-buttons" id="customButtons">
+                <!-- 自定义按钮将在这里动态生成 -->
+              </div>
+              <button class="ant-btn ant-btn-success" id="addBtn" title="添加自定义按钮" style="font-size: 12px; padding: 2px 8px; height: 24px;">+ 增加</button>
+            </div>
+            <div class="toolbar-section toolbar-section-2">
+              <div class="url-container">
+                <div class="url-display" id="urlDisplay" title="${url}">${url}</div>
+                <div class="nav-buttons">
+                  <button class="nav-button" id="backBtn" title="上一页">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                  </button>
+                  <button class="nav-button" id="homeBtn" title="主页">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                      <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                  </button>
+                  <button class="nav-button" id="forwardBtn" title="下一页">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="toolbar-section toolbar-section-3">
+              <div class="tool-buttons">
+                <button class="ant-btn ant-btn-default" id="refreshBtn" title="刷新" style="font-size: 12px; padding: 2px 8px; height: 24px;">刷新</button>
+                <button class="ant-btn ant-btn-default" id="switchBtn" title="切换" style="font-size: 12px; padding: 2px 8px; height: 24px;">切换</button>
+              </div>
+            </div>
+          </div>
+          <div class="webview-container">
+            <webview id="webview" src="${url}" nodeintegration="false" contextIsolation="true" webpreferences="contextIsolation=true,nodeIntegration=false"></webview>
+          </div>
+        </div>
+        <script>
+          const webview = document.getElementById('webview');
+          const backBtn = document.getElementById('backBtn');
+          const forwardBtn = document.getElementById('forwardBtn');
+          const homeBtn = document.getElementById('homeBtn');
+          const refreshBtn = document.getElementById('refreshBtn');
+          const switchBtn = document.getElementById('switchBtn');
+          const addBtn = document.getElementById('addBtn');
+          const urlDisplay = document.getElementById('urlDisplay');
+
+          // 导航功能
+          backBtn.addEventListener('click', () => {
+            if (webview.canGoBack()) {
+              webview.goBack();
+            }
+          });
+
+          forwardBtn.addEventListener('click', () => {
+            if (webview.canGoForward()) {
+              webview.goForward();
+            }
+          });
+
+          homeBtn.addEventListener('click', () => {
+            webview.src = '${url}';
+          });
+
+          // 刷新功能
+          refreshBtn.addEventListener('click', () => {
+            webview.reload();
+          });
+
+          // 切换功能（预留）
+          switchBtn.addEventListener('click', () => {
+            alert('切换功能开发中...');
+          });
+
+          // 增加按钮功能
+          addBtn.addEventListener('click', () => {
+            window.parent.postMessage({
+              type: 'openAddCustomButton',
+              url: webview.src,
+              name: ''
+            }, '*');
+          });
+
+          // 更新URL显示和按钮状态
+          webview.addEventListener('dom-ready', () => {
+            urlDisplay.textContent = webview.src;
+            urlDisplay.title = webview.src;
+            backBtn.disabled = !webview.canGoBack();
+            forwardBtn.disabled = !webview.canGoForward();
+          });
+
+          webview.addEventListener('did-navigate', () => {
+            urlDisplay.textContent = webview.src;
+            urlDisplay.title = webview.src;
+            backBtn.disabled = !webview.canGoBack();
+            forwardBtn.disabled = !webview.canGoForward();
+          });
+
+          // 监听来自父窗口的消息
+          window.addEventListener('message', (event) => {
+            if (event.data.type === 'updateCustomButtons') {
+              updateCustomButtons(event.data.buttons);
+            } else if (event.data.type === 'navigateToUrl') {
+              webview.src = event.data.url;
+            }
+          });
+
+          // 更新自定义按钮
+          function updateCustomButtons(buttons) {
+            const container = document.getElementById('customButtons');
+            container.innerHTML = '';
+
+            if (buttons && buttons.length > 0) {
+              buttons.forEach(button => {
+                const btn = document.createElement('button');
+                btn.className = 'ant-btn ant-btn-primary';
+                btn.textContent = button.name;
+                btn.title = button.name;
+                btn.style.cssText = 'font-size: 12px; padding: 2px 8px; height: 24px;';
+                btn.addEventListener('click', () => {
+                  if (button.openMode === 'currentPage') {
+                    webview.src = button.url;
+                  } else {
+                    // 新窗口打开
+                    window.parent.postMessage({
+                      type: 'openNewWindow',
+                      url: button.url,
+                      name: button.name
+                    }, '*');
+                  }
+                });
+                container.appendChild(btn);
+              });
+            }
+
+            // 如果没有自定义按钮，显示增加按钮
+            if (!buttons || buttons.length === 0) {
+              addBtn.style.display = 'inline-block';
+            } else {
+              addBtn.style.display = 'none';
+            }
+          }
+
+          // 初始化时向父窗口请求自定义按钮数据
+          window.parent.postMessage({ type: 'requestCustomButtons' }, '*');
+        </script>
+      </body>
+    </html>
+  `
+
+  childWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent))
 
   // 设置窗口标题
   if (websiteName) {
     childWin.setTitle(websiteName)
   }
 
-  // 等待页面加载后更新标题
-  childWin.webContents.on('page-title-updated', (event) => {
-    // 如果有网站名称，阻止默认行为，使用自定义名称
-    if (websiteName) {
-      event.preventDefault()
-      childWin.setTitle(websiteName)
+  // 监听来自功能栏的消息
+  childWin.webContents.on('dom-ready', () => {
+    // 向功能栏发送自定义按钮数据
+    const websiteData = storageService.getWebsites().find(w => w.url === url)
+    if (websiteData && websiteData.customButtons) {
+      childWin.webContents.executeJavaScript(`
+        window.postMessage({
+          type: 'updateCustomButtons',
+          buttons: ${JSON.stringify(websiteData.customButtons)}
+        }, '*');
+      `)
     }
+  })
+
+  childWin.webContents.on('ipc-message', (event, channel, ...args) => {
+    if (channel === 'requestCustomButtons') {
+      const websiteData = storageService.getWebsites().find(w => w.url === url)
+      if (websiteData && websiteData.customButtons) {
+        event.sender.send('updateCustomButtons', websiteData.customButtons)
+      }
+    } else if (channel === 'openNewWindow') {
+      const [url, name] = args
+      createChildWindow(url, Date.now().toString(), 'maximized', name)
+    }
+  })
+
+  // 监听来自功能栏的消息（通过executeJavaScript）
+  childWin.webContents.on('dom-ready', () => {
+    // 设置消息监听器
+    childWin.webContents.executeJavaScript(`
+      window.addEventListener('message', (event) => {
+        if (event.data.type === 'openAddCustomButton') {
+          // 向主进程发送添加自定义按钮的请求
+          require('electron').ipcRenderer.send('open-add-custom-button', {
+            url: event.data.url,
+            name: event.data.name
+          });
+        }
+      });
+    `)
   })
 
   childWindows.set(windowId, childWin)
 
   childWin.on('closed', () => {
     childWindows.delete(windowId)
+  })
+
+  // 处理页面标题更新
+  childWin.webContents.on('page-title-updated', (event, title) => {
+    // 如果webview中的页面标题更新，更新窗口标题
+    if (websiteName) {
+      event.preventDefault()
+      childWin.setTitle(websiteName)
+    } else {
+      childWin.setTitle(title)
+    }
   })
 
   return childWin
@@ -400,6 +818,40 @@ function setupIpcHandlers() {
   // 获取开机启动状态
   ipcMain.handle('get-auto-start-status', () => {
     return settingsService.getAutoStartStatus()
+  })
+
+  // 处理添加自定义按钮请求
+  ipcMain.on('open-add-custom-button', (event, data) => {
+    // 查找当前网站
+    const websites = storageService.getWebsites()
+    const currentWebsite = websites.find(w => event.sender.getURL().includes(w.url))
+
+    if (currentWebsite) {
+      // 打开自定义按钮编辑窗口（这里简化处理，实际应该打开编辑窗口）
+      const newButton = {
+        id: Date.now().toString(),
+        name: '新按钮',
+        url: data.url,
+        openMode: 'currentPage' as const
+      }
+
+      // 添加到网站的自定义按钮列表
+      if (!currentWebsite.customButtons) {
+        currentWebsite.customButtons = []
+      }
+      currentWebsite.customButtons.push(newButton)
+
+      // 保存更新
+      storageService.updateWebsite(currentWebsite.id, currentWebsite)
+
+      // 通知窗口更新按钮
+      event.sender.executeJavaScript(`
+        window.postMessage({
+          type: 'updateCustomButtons',
+          buttons: ${JSON.stringify(currentWebsite.customButtons)}
+        }, '*');
+      `)
+    }
   })
 }
 

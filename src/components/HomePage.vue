@@ -164,25 +164,6 @@ const handleWebsiteClick = async (website: Website) => {
   }
 }
 
-// 点击自定义按钮
-const handleCustomButtonClick = async (button: any, event: Event) => {
-  event.stopPropagation()
-
-  try {
-    if (button.openMode === 'newWindow') {
-      await window.ipcRenderer.invoke('create-window', button.url, 'maximized', button.name)
-    } else if (button.openMode === 'newTab') {
-      // 在同一个窗口打开新标签页（创建新窗口）
-      await window.ipcRenderer.invoke('create-window', button.url, 'maximized', button.name)
-    } else if (button.openMode === 'currentPage') {
-      // 本页打开（将当前窗口导航到目标 URL）
-      window.location.href = button.url
-    }
-  } catch (error) {
-    message.error('打开链接失败')
-    console.error(error)
-  }
-}
 
 // 添加成功回调
 const handleAddSuccess = async () => {
@@ -264,18 +245,6 @@ const loadSettingsAndApplyTheme = async () => {
           <AppstoreAddOutlined v-else :style="{ fontSize: '48px' }" />
         </div>
         <div class="website-name">{{ website.name }}</div>
-        
-        <!-- 自定义按钮 -->
-        <div class="custom-buttons" v-if="website.customButtons && website.customButtons.length > 0">
-          <a-button
-            v-for="button in website.customButtons"
-            :key="button.id"
-            size="small"
-            @click="handleCustomButtonClick(button, $event)"
-          >
-            {{ button.name }}
-          </a-button>
-        </div>
       </div>
 
       <!-- 添加网站卡片 -->
