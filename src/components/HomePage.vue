@@ -59,6 +59,9 @@ const handleSettingsChanged = (settings: any) => {
 
   // 应用黑暗模式
   applyDarkMode(settings)
+
+  // 应用背景设置
+  applyBackgroundSettings(settings)
 }
 
 // 应用黑暗模式
@@ -71,6 +74,36 @@ const applyDarkMode = (settings: any) => {
     } else {
       document.documentElement.classList.remove('dark')
       document.documentElement.removeAttribute('data-theme')
+    }
+  })
+}
+
+// 应用背景设置
+const applyBackgroundSettings = (settings: any) => {
+  nextTick(() => {
+    const homePageElement = document.querySelector('.home-page') as HTMLElement
+    if (!homePageElement) return
+
+    switch (settings.backgroundType) {
+      case 'default':
+        homePageElement.style.background = '#f0f2f5'
+        homePageElement.style.backgroundImage = ''
+        break
+      case 'solid':
+        homePageElement.style.background = settings.backgroundColor
+        homePageElement.style.backgroundImage = ''
+        break
+      case 'image':
+        if (settings.backgroundImage) {
+          homePageElement.style.backgroundImage = `url(${settings.backgroundImage})`
+          homePageElement.style.backgroundSize = 'cover'
+          homePageElement.style.backgroundPosition = 'center'
+          homePageElement.style.backgroundRepeat = 'no-repeat'
+        } else {
+          homePageElement.style.background = '#f0f2f5'
+          homePageElement.style.backgroundImage = ''
+        }
+        break
     }
   })
 }
@@ -119,11 +152,11 @@ const handleWebsiteClick = async (website: Website) => {
   if (website.id === 'add') {
     openAddModal()
   } else {
-    // 创建新窗口打开网站，传递网站名称和窗口模式
+    // 创建新窗口打开网站，传递网站名称、窗口模式和图标
     try {
       // 兼容旧数据：如果没有 windowMode，根据 fullscreen 决定
       const windowMode = website.windowMode || (website.fullscreen ? 'fullscreen' : 'maximized')
-      await window.ipcRenderer.invoke('create-window', website.url, windowMode, website.name)
+      await window.ipcRenderer.invoke('create-window', website.url, windowMode, website.name, website.icon)
     } catch (error) {
       message.error('打开网站失败')
       console.error(error)
@@ -134,13 +167,13 @@ const handleWebsiteClick = async (website: Website) => {
 // 点击自定义按钮
 const handleCustomButtonClick = async (button: any, event: Event) => {
   event.stopPropagation()
-  
+
   try {
     if (button.openMode === 'newWindow') {
-      await window.ipcRenderer.invoke('create-window', button.url)
+      await window.ipcRenderer.invoke('create-window', button.url, 'maximized', button.name)
     } else if (button.openMode === 'newTab') {
       // 在同一个窗口打开新标签页（创建新窗口）
-      await window.ipcRenderer.invoke('create-window', button.url)
+      await window.ipcRenderer.invoke('create-window', button.url, 'maximized', button.name)
     } else if (button.openMode === 'currentPage') {
       // 本页打开（将当前窗口导航到目标 URL）
       window.location.href = button.url
@@ -179,6 +212,7 @@ const loadSettingsAndApplyTheme = async () => {
     const settings = await window.ipcRenderer.invoke('get-settings')
     if (settings) {
       applyDarkMode(settings)
+      applyBackgroundSettings(settings)
     }
   } catch (error) {
     console.error('加载设置失败:', error)

@@ -169,7 +169,7 @@ async function createWindow() {
 }
 
 // 创建子窗口
-async function createChildWindow(url: string, windowId: string, windowMode: 'normal' | 'maximized' | 'fullscreen' | boolean = 'maximized', websiteName?: string) {
+async function createChildWindow(url: string, windowId: string, windowMode: 'normal' | 'maximized' | 'fullscreen' | boolean = 'maximized', websiteName?: string, websiteIcon?: string) {
   // 兼容旧的 boolean 类型（fullscreen 参数）
   let mode: 'normal' | 'maximized' | 'fullscreen'
   if (typeof windowMode === 'boolean') {
@@ -178,12 +178,28 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
     mode = windowMode
   }
   
+  // 设置窗口图标
+  let windowIcon = path.join(process.env.VITE_PUBLIC || __dirname, 'electron-vite.svg')
+
+  // 如果有网站图标，尝试下载并使用
+  if (websiteIcon) {
+    try {
+      const iconPath = await downloadIcon(websiteIcon, `window_${windowId}`)
+      if (iconPath && fs.existsSync(iconPath)) {
+        windowIcon = iconPath
+      }
+    } catch (error) {
+      console.log('下载网站图标失败，使用默认图标')
+    }
+  }
+
   const childWin = new BrowserWindow({
     width: 1000,
     height: 700,
     show: false, // 先不显示，等设置好大小后再显示
     fullscreen: mode === 'fullscreen',
     autoHideMenuBar: true,
+    icon: windowIcon,
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       webviewTag: true,
@@ -284,9 +300,9 @@ function setupIpcHandlers() {
   })
 
   // 创建新窗口
-  ipcMain.handle('create-window', async (_event, url, windowMode: 'normal' | 'maximized' | 'fullscreen' | boolean = 'maximized', websiteName?: string) => {
+  ipcMain.handle('create-window', async (_event, url, windowMode: 'normal' | 'maximized' | 'fullscreen' | boolean = 'maximized', websiteName?: string, websiteIcon?: string) => {
     const windowId = Date.now().toString()
-    await createChildWindow(url, windowId, windowMode, websiteName)
+    await createChildWindow(url, windowId, windowMode, websiteName, websiteIcon)
     return windowId
   })
 

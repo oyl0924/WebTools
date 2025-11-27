@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, onMounted, nextTick } from 'vue'
+import { reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { CloseOutlined } from '@ant-design/icons-vue'
 
@@ -19,10 +19,15 @@ interface Settings {
   isDarkMode: boolean
   homeWindowSize: 'normal' | 'maximized' | 'fullscreen'
   autoStart: boolean
+  backgroundType: 'default' | 'solid' | 'image'
+  backgroundColor: string
+  backgroundImage: string
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
+
+import dayjs from 'dayjs'
 
 const settings = reactive<Settings>({
   darkMode: 'manual',
@@ -30,7 +35,10 @@ const settings = reactive<Settings>({
   darkModeTimeEnd: '06:00',
   isDarkMode: false,
   homeWindowSize: 'maximized',
-  autoStart: false
+  autoStart: false,
+  backgroundType: 'default',
+  backgroundColor: '#f0f2f5',
+  backgroundImage: ''
 })
 
 // 加载设置
@@ -59,13 +67,16 @@ const saveSettings = async () => {
     }
 
     // 创建纯对象副本，避免传递响应式对象
-    const settingsToSave = {
+    const settingsToSave: Settings = {
       darkMode: settings.darkMode,
       darkModeTimeStart: settings.darkModeTimeStart,
       darkModeTimeEnd: settings.darkModeTimeEnd,
       isDarkMode: settings.isDarkMode,
       homeWindowSize: settings.homeWindowSize,
-      autoStart: settings.autoStart
+      autoStart: settings.autoStart,
+      backgroundType: settings.backgroundType,
+      backgroundColor: settings.backgroundColor,
+      backgroundImage: settings.backgroundImage
     }
 
     await window.ipcRenderer.invoke('save-settings', settingsToSave)
@@ -117,12 +128,25 @@ const applyDarkMode = () => {
   }
 }
 
-// 监听设置变化
-const handleSettingsChange = () => {
-  // 延迟执行以避免在组件更新周期中修改状态
-  nextTick(() => {
-    applyDarkMode()
-  })
+// 选择背景图片
+const selectBackgroundImage = () => {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.onchange = (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const result = event.target?.result as string
+      if (result) {
+        settings.backgroundImage = result
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+  input.click()
 }
 
 onMounted(() => {
@@ -147,7 +171,7 @@ onMounted(() => {
       <!-- 黑暗模式设置 -->
       <div class="setting-item">
         <h3>黑暗模式</h3>
-        <a-radio-group v-model:value="settings.darkMode" @change="handleSettingsChange">
+        <a-radio-group v-model:value="settings.darkMode">
           <a-radio value="manual">手动</a-radio>
           <a-radio value="system">跟随系统</a-radio>
           <a-radio value="time">根据时间</a-radio>
@@ -155,7 +179,7 @@ onMounted(() => {
 
         <!-- 手动模式开关 -->
         <div v-if="settings.darkMode === 'manual'" class="sub-setting">
-          <a-switch v-model:checked="settings.isDarkMode" @change="handleSettingsChange" />
+          <a-switch v-model:checked="settings.isDarkMode" />
           <span class="switch-label">{{ settings.isDarkMode ? '黑暗模式' : '明亮模式' }}</span>
         </div>
 
@@ -164,15 +188,15 @@ onMounted(() => {
           <div class="time-range">
             <span>开始时间：</span>
             <a-time-picker
-              v-model:value="settings.darkModeTimeStart"
+              :value="dayjs(settings.darkModeTimeStart, 'HH:mm')"
               format="HH:mm"
-              @change="handleSettingsChange"
+              @change="(time: any) => settings.darkModeTimeStart = time ? time.format('HH:mm') : '18:00'"
             />
             <span style="margin-left: 16px">结束时间：</span>
             <a-time-picker
-              v-model:value="settings.darkModeTimeEnd"
+              :value="dayjs(settings.darkModeTimeEnd, 'HH:mm')"
               format="HH:mm"
-              @change="handleSettingsChange"
+              @change="(time: any) => settings.darkModeTimeEnd = time ? time.format('HH:mm') : '06:00'"
             />
           </div>
         </div>
@@ -194,6 +218,34 @@ onMounted(() => {
         <div class="sub-setting">
           <a-switch v-model:checked="settings.autoStart" />
           <span class="switch-label">{{ settings.autoStart ? '开机自动启动' : '不开机启动' }}</span>
+        </div>
+      </div>
+
+      <!-- 背景设置 -->
+      <div class="setting-item">
+        <h3>背景设置</h3>
+        <a-radio-group v-model:value="settings.backgroundType">
+          <a-radio value="default">默认背景</a-radio>
+          <a-radio value="solid">纯色背景</a-radio>
+          <a-radio value="image">图片背景</a-radio>
+        </a-radio-group>
+
+        <!-- 纯色背景设置 -->
+        <div v-if="settings.backgroundType === 'solid'" class="sub-setting">
+          <span>背景颜色：</span>
+          <a-input
+            v-model:value="settings.backgroundColor"
+            type="color"
+            style="width: 80px; height: 32px; padding: 0; border: none;"
+          />
+        </div>
+
+        <!-- 图片背景设置 -->
+        <div v-if="settings.backgroundType === 'image'" class="sub-setting">
+          <a-button @click="selectBackgroundImage">选择图片</a-button>
+          <span v-if="settings.backgroundImage" style="margin-left: 12px; font-size: 12px; color: #666;">
+            已选择图片
+          </span>
         </div>
       </div>
     </div>

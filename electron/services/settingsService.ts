@@ -9,6 +9,9 @@ interface Settings {
   isDarkMode: boolean
   homeWindowSize: 'normal' | 'maximized' | 'fullscreen'
   autoStart: boolean
+  backgroundType: 'default' | 'solid' | 'image'
+  backgroundColor: string
+  backgroundImage: string
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -17,7 +20,10 @@ const DEFAULT_SETTINGS: Settings = {
   darkModeTimeEnd: '06:00',
   isDarkMode: false,
   homeWindowSize: 'maximized',
-  autoStart: false
+  autoStart: false,
+  backgroundType: 'default',
+  backgroundColor: '#f0f2f5',
+  backgroundImage: ''
 }
 
 class SettingsService {
@@ -92,11 +98,19 @@ class SettingsService {
   async setAutoStart(enabled: boolean): Promise<void> {
     try {
       const { app } = await import('electron')
+
+      // 设置开机启动项 - 使用更完整的配置
       app.setLoginItemSettings({
         openAtLogin: enabled,
-        openAsHidden: false
+        openAsHidden: false,
+        path: app.getPath('exe'),
+        args: enabled ? [] : ['--disable-auto-start']
       })
+
+      // 更新设置
       this.updateSettings({ autoStart: enabled })
+
+      console.log(`开机启动设置已${enabled ? '启用' : '禁用'}`)
     } catch (error) {
       console.error('设置开机启动失败:', error)
       throw error
@@ -106,9 +120,16 @@ class SettingsService {
   // 获取开机启动状态
   getAutoStartStatus(): boolean {
     try {
-      const app = require('electron').app
+      const { app } = require('electron')
       const loginSettings = app.getLoginItemSettings()
-      return loginSettings.openAtLogin
+
+      // 检查多种可能的启动配置
+      const isEnabled = loginSettings.openAtLogin ||
+                       (loginSettings.executableWillLaunchAtLogin ?? false) ||
+                       (loginSettings.launchItems && loginSettings.launchItems.length > 0)
+
+      console.log(`获取开机启动状态: ${isEnabled ? '启用' : '禁用'}`, loginSettings)
+      return isEnabled
     } catch (error) {
       console.error('获取开机启动状态失败:', error)
       return false

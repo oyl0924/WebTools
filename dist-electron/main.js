@@ -107,7 +107,10 @@ const DEFAULT_SETTINGS = {
   darkModeTimeEnd: "06:00",
   isDarkMode: false,
   homeWindowSize: "maximized",
-  autoStart: false
+  autoStart: false,
+  backgroundType: "default",
+  backgroundColor: "#f0f2f5",
+  backgroundImage: ""
 };
 class SettingsService {
   constructor() {
@@ -172,9 +175,12 @@ class SettingsService {
       const { app: app2 } = await import("electron");
       app2.setLoginItemSettings({
         openAtLogin: enabled,
-        openAsHidden: false
+        openAsHidden: false,
+        path: app2.getPath("exe"),
+        args: enabled ? [] : ["--disable-auto-start"]
       });
       this.updateSettings({ autoStart: enabled });
+      console.log(`开机启动设置已${enabled ? "启用" : "禁用"}`);
     } catch (error) {
       console.error("设置开机启动失败:", error);
       throw error;
@@ -183,9 +189,11 @@ class SettingsService {
   // 获取开机启动状态
   getAutoStartStatus() {
     try {
-      const app2 = require("electron").app;
+      const { app: app2 } = require("electron");
       const loginSettings = app2.getLoginItemSettings();
-      return loginSettings.openAtLogin;
+      const isEnabled = loginSettings.openAtLogin || (loginSettings.executableWillLaunchAtLogin ?? false) || loginSettings.launchItems && loginSettings.launchItems.length > 0;
+      console.log(`获取开机启动状态: ${isEnabled ? "启用" : "禁用"}`, loginSettings);
+      return isEnabled;
     } catch (error) {
       console.error("获取开机启动状态失败:", error);
       return false;
@@ -311,12 +319,23 @@ async function createWindow() {
     win.loadFile(path$1.join(RENDERER_DIST, "index.html"));
   }
 }
-async function createChildWindow(url, windowId, windowMode = "maximized", websiteName) {
+async function createChildWindow(url, windowId, windowMode = "maximized", websiteName, websiteIcon) {
   let mode;
   if (typeof windowMode === "boolean") {
     mode = windowMode ? "fullscreen" : "maximized";
   } else {
     mode = windowMode;
+  }
+  let windowIcon = path$1.join(process.env.VITE_PUBLIC || __dirname$1, "electron-vite.svg");
+  if (websiteIcon) {
+    try {
+      const iconPath = await downloadIcon(websiteIcon, `window_${windowId}`);
+      if (iconPath && fs$1.existsSync(iconPath)) {
+        windowIcon = iconPath;
+      }
+    } catch (error) {
+      console.log("下载网站图标失败，使用默认图标");
+    }
   }
   const childWin = new BrowserWindow({
     width: 1e3,
@@ -325,6 +344,7 @@ async function createChildWindow(url, windowId, windowMode = "maximized", websit
     // 先不显示，等设置好大小后再显示
     fullscreen: mode === "fullscreen",
     autoHideMenuBar: true,
+    icon: windowIcon,
     webPreferences: {
       preload: path$1.join(__dirname$1, "preload.mjs"),
       webviewTag: true,
@@ -389,9 +409,9 @@ function setupIpcHandlers() {
   ipcMain.handle("delete-custom-button", (_event, websiteId, buttonId) => {
     return storageService.deleteCustomButton(websiteId, buttonId);
   });
-  ipcMain.handle("create-window", async (_event, url, windowMode = "maximized", websiteName) => {
+  ipcMain.handle("create-window", async (_event, url, windowMode = "maximized", websiteName, websiteIcon) => {
     const windowId = Date.now().toString();
-    await createChildWindow(url, windowId, windowMode, websiteName);
+    await createChildWindow(url, windowId, windowMode, websiteName, websiteIcon);
     return windowId;
   });
   ipcMain.handle("navigate-to-url", (_event, windowId, url) => {
