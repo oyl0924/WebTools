@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { PlusOutlined, CloseOutlined, EditOutlined, DeleteOutlined, DesktopOutlined, SettingOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, CloseOutlined, EditOutlined, DeleteOutlined, DesktopOutlined, SettingOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons-vue'
 import type { Website } from '../types'
 import AddWebsiteModal from './AddWebsiteModal.vue'
 import EditWebsiteModal from './EditWebsiteModal.vue'
@@ -21,6 +21,8 @@ const showAddModal = ref(false)
 const showEditModal = ref(false)
 const showCustomButtonModal = ref(false)
 const currentWebsite = ref<Website | null>(null)
+const selectedRowKeys = ref<string[]>([])
+const selectedWebsites = ref<Website[]>([])
 
 // 加载网站数据
 const loadWebsites = async () => {
@@ -38,7 +40,7 @@ const toggleWindowMode = async (website: Website) => {
   // 循环切换：normal -> maximized -> fullscreen -> normal
   let newMode: 'normal' | 'maximized' | 'fullscreen'
   const currentMode = website.windowMode || (website.fullscreen ? 'fullscreen' : 'maximized')
-  
+
   if (currentMode === 'normal') {
     newMode = 'maximized'
   } else if (currentMode === 'maximized') {
@@ -46,13 +48,15 @@ const toggleWindowMode = async (website: Website) => {
   } else {
     newMode = 'normal'
   }
-  
+
   try {
     await window.ipcRenderer.invoke('update-website', website.id, {
       windowMode: newMode
     })
     message.success('设置成功')
     await loadWebsites()
+    // 立即触发成功回调，通知父组件更新
+    emit('success')
   } catch (error) {
     message.error('设置失败')
     console.error(error)
@@ -83,12 +87,54 @@ const deleteWebsite = async (website: Website) => {
         await window.ipcRenderer.invoke('delete-website', website.id)
         message.success('删除成功')
         await loadWebsites()
+        // 立即触发成功回调，通知父组件更新
+        emit('success')
       } catch (error) {
         message.error('删除失败')
         console.error(error)
       }
     }
   })
+}
+
+// 批量删除网站
+const batchDeleteWebsites = () => {
+  if (selectedRowKeys.value.length === 0) {
+    message.warning('请先选择要删除的网站')
+    return
+  }
+
+  Modal.confirm({
+    title: '确认批量删除',
+    content: `确定要删除选中的 ${selectedRowKeys.value.length} 个网站吗？`,
+    okText: '确定',
+    cancelText: '取消',
+    okButtonProps: { danger: true },
+    onOk: async () => {
+      try {
+        // 批量删除选中的网站
+        for (const websiteId of selectedRowKeys.value) {
+          await window.ipcRenderer.invoke('delete-website', websiteId)
+        }
+        message.success(`成功删除 ${selectedRowKeys.value.length} 个网站`)
+        // 清空选择
+        selectedRowKeys.value = []
+        selectedWebsites.value = []
+        await loadWebsites()
+        // 立即触发成功回调，通知父组件更新
+        emit('success')
+      } catch (error) {
+        message.error('批量删除失败')
+        console.error(error)
+      }
+    }
+  })
+}
+
+// 选择变化处理
+const handleSelectionChange = (selectedKeys: string[], selectedRows: Website[]) => {
+  selectedRowKeys.value = selectedKeys
+  selectedWebsites.value = selectedRows
 }
 
 // 添加到桌面
@@ -115,6 +161,83 @@ const handleClose = () => {
 // 打开添加弹窗
 const openAddModal = () => {
   showAddModal.value = true
+}
+
+// 导出网站数据
+const exportWebsites = () => {
+  try {
+    const dataStr = JSON.stringify(websites.value, null, 2)
+    const dataBlob = new Blob([dataStr], { type: 'application/json' })
+    const url = URL.createObjectURL(dataBlob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `websites_backup_${new Date().toISOString().slice(0, 10)}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    message.success('导出成功')
+  } catch (error) {
+    message.error('导出失败')
+    console.error(error)
+  }
+}
+
+// 导入网站数据
+const importWebsites = () => {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json'
+  input.onchange = async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file) return
+
+    try {
+      const text = await file.text()
+      const importedWebsites = JSON.parse(text) as Website[]
+
+      if (!Array.isArray(importedWebsites)) {
+        throw new Error('无效的数据格式')
+      }
+
+      // 验证数据格式
+      for (const website of importedWebsites) {
+        if (!website.name || !website.url) {
+          throw new Error('数据格式错误：缺少必填字段')
+        }
+      }
+
+      Modal.confirm({
+        title: '确认导入',
+        content: `确定要导入 ${importedWebsites.length} 个网站吗？这将不会影响现有的网站。`,
+        okText: '确定',
+        cancelText: '取消',
+        onOk: async () => {
+          try {
+            // 为每个导入的网站生成新ID并添加
+            for (const website of importedWebsites) {
+              const newWebsite = {
+                ...website,
+                id: undefined, // 让系统生成新ID
+                customButtons: website.customButtons || []
+              }
+              await window.ipcRenderer.invoke('add-website', newWebsite)
+            }
+            message.success(`成功导入 ${importedWebsites.length} 个网站`)
+            await loadWebsites()
+            emit('success')
+          } catch (error) {
+            message.error('导入失败')
+            console.error(error)
+          }
+        }
+      })
+    } catch (error) {
+      message.error('文件格式错误，请选择有效的JSON文件')
+      console.error(error)
+    }
+  }
+  input.click()
 }
 
 // 添加成功回调
@@ -177,6 +300,28 @@ watch(() => props.open, handleOpenChange)
           </template>
           新增
         </a-button>
+        <a-button @click="importWebsites">
+          <template #icon>
+            <UploadOutlined />
+          </template>
+          导入
+        </a-button>
+        <a-button @click="exportWebsites">
+          <template #icon>
+            <DownloadOutlined />
+          </template>
+          导出
+        </a-button>
+        <a-button
+          danger
+          @click="batchDeleteWebsites"
+          :disabled="selectedRowKeys.length === 0"
+        >
+          <template #icon>
+            <DeleteOutlined />
+          </template>
+          批量删除 ({{ selectedRowKeys.length }})
+        </a-button>
       </div>
 
       <!-- 网站列表 -->
@@ -191,6 +336,10 @@ watch(() => props.open, handleOpenChange)
         :pagination="false"
         :scroll="{ y: 400 }"
         rowKey="id"
+        :rowSelection="{
+          selectedRowKeys: selectedRowKeys,
+          onChange: handleSelectionChange
+        }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'icon'">
@@ -269,6 +418,7 @@ watch(() => props.open, handleOpenChange)
   margin-bottom: 16px;
   display: flex;
   justify-content: flex-start;
+  gap: 12px;
 }
 
 .website-icon-img {

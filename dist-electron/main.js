@@ -1,221 +1,369 @@
-var I = Object.defineProperty;
-var T = (i, t, e) => t in i ? I(i, t, { enumerable: !0, configurable: !0, writable: !0, value: e }) : i[t] = e;
-var P = (i, t, e) => T(i, typeof t != "symbol" ? t + "" : t, e);
-import { app as f, BrowserWindow as v, ipcMain as d, shell as W } from "electron";
-import { fileURLToPath as B } from "node:url";
-import c from "node:path";
-import u from "node:fs";
-import R from "node:https";
-import E from "node:http";
-import w from "fs";
-import j from "path";
-const k = "websites.json";
-class O {
+var __defProp = Object.defineProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { fileURLToPath } from "node:url";
+import path$1 from "node:path";
+import fs$1 from "node:fs";
+import https from "node:https";
+import http from "node:http";
+import fs from "fs";
+import path from "path";
+const STORAGE_FILE = "websites.json";
+class StorageService {
   constructor() {
-    P(this, "storagePath");
-    this.storagePath = j.join(f.getPath("userData"), k), this.initStorage();
+    __publicField(this, "storagePath");
+    this.storagePath = path.join(app.getPath("userData"), STORAGE_FILE);
+    this.initStorage();
   }
   initStorage() {
-    w.existsSync(this.storagePath) || this.saveData([]);
+    if (!fs.existsSync(this.storagePath)) {
+      this.saveData([]);
+    }
   }
   loadData() {
     try {
-      const t = w.readFileSync(this.storagePath, "utf-8");
-      return JSON.parse(t);
-    } catch (t) {
-      return console.error("Error loading data:", t), [];
+      const data = fs.readFileSync(this.storagePath, "utf-8");
+      return JSON.parse(data);
+    } catch (error) {
+      console.error("Error loading data:", error);
+      return [];
     }
   }
-  saveData(t) {
+  saveData(websites) {
     try {
-      w.writeFileSync(this.storagePath, JSON.stringify(t, null, 2), "utf-8");
-    } catch (e) {
-      console.error("Error saving data:", e);
+      fs.writeFileSync(this.storagePath, JSON.stringify(websites, null, 2), "utf-8");
+    } catch (error) {
+      console.error("Error saving data:", error);
     }
   }
   getWebsites() {
     return this.loadData();
   }
-  addWebsite(t) {
-    const e = this.loadData(), o = {
-      ...t,
+  addWebsite(website) {
+    const websites = this.loadData();
+    const newWebsite = {
+      ...website,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      customButtons: t.customButtons || []
+      customButtons: website.customButtons || []
     };
-    return e.push(o), this.saveData(e), o;
+    websites.push(newWebsite);
+    this.saveData(websites);
+    return newWebsite;
   }
-  updateWebsite(t, e) {
-    const o = this.loadData(), s = o.findIndex((n) => n.id === t);
-    return s === -1 ? null : (o[s] = { ...o[s], ...e }, this.saveData(o), o[s]);
+  updateWebsite(id, updates) {
+    const websites = this.loadData();
+    const index = websites.findIndex((w) => w.id === id);
+    if (index === -1) return null;
+    websites[index] = { ...websites[index], ...updates };
+    this.saveData(websites);
+    return websites[index];
   }
-  deleteWebsite(t) {
-    const e = this.loadData(), o = e.findIndex((s) => s.id === t);
-    return o === -1 ? !1 : (e.splice(o, 1), this.saveData(e), !0);
+  deleteWebsite(id) {
+    const websites = this.loadData();
+    const index = websites.findIndex((w) => w.id === id);
+    if (index === -1) return false;
+    websites.splice(index, 1);
+    this.saveData(websites);
+    return true;
   }
-  addCustomButton(t, e) {
-    const o = this.loadData(), s = o.find((r) => r.id === t);
-    if (!s) return null;
-    const n = {
-      ...e,
+  addCustomButton(websiteId, button) {
+    const websites = this.loadData();
+    const website = websites.find((w) => w.id === websiteId);
+    if (!website) return null;
+    const newButton = {
+      ...button,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9)
     };
-    return s.customButtons.push(n), this.saveData(o), n;
+    website.customButtons.push(newButton);
+    this.saveData(websites);
+    return newButton;
   }
-  updateCustomButton(t, e, o) {
-    const s = this.loadData(), n = s.find((l) => l.id === t);
-    if (!n) return null;
-    const r = n.customButtons.findIndex((l) => l.id === e);
-    return r === -1 ? null : (n.customButtons[r] = { ...n.customButtons[r], ...o }, this.saveData(s), n.customButtons[r]);
+  updateCustomButton(websiteId, buttonId, updates) {
+    const websites = this.loadData();
+    const website = websites.find((w) => w.id === websiteId);
+    if (!website) return null;
+    const buttonIndex = website.customButtons.findIndex((b) => b.id === buttonId);
+    if (buttonIndex === -1) return null;
+    website.customButtons[buttonIndex] = { ...website.customButtons[buttonIndex], ...updates };
+    this.saveData(websites);
+    return website.customButtons[buttonIndex];
   }
-  deleteCustomButton(t, e) {
-    const o = this.loadData(), s = o.find((r) => r.id === t);
-    if (!s) return !1;
-    const n = s.customButtons.findIndex((r) => r.id === e);
-    return n === -1 ? !1 : (s.customButtons.splice(n, 1), this.saveData(o), !0);
+  deleteCustomButton(websiteId, buttonId) {
+    const websites = this.loadData();
+    const website = websites.find((w) => w.id === websiteId);
+    if (!website) return false;
+    const buttonIndex = website.customButtons.findIndex((b) => b.id === buttonId);
+    if (buttonIndex === -1) return false;
+    website.customButtons.splice(buttonIndex, 1);
+    this.saveData(websites);
+    return true;
   }
 }
-const h = new O(), D = c.dirname(B(import.meta.url));
-process.env.APP_ROOT = c.join(D, "..");
-const g = process.env.VITE_DEV_SERVER_URL, J = c.join(process.env.APP_ROOT, "dist-electron"), y = c.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = g ? c.join(process.env.APP_ROOT, "public") : y;
-let a;
-const b = /* @__PURE__ */ new Map();
-function A() {
-  const i = c.join(f.getPath("userData"), "icons");
-  return u.existsSync(i) || u.mkdirSync(i, { recursive: !0 }), i;
+const storageService = new StorageService();
+const __dirname$1 = path$1.dirname(fileURLToPath(import.meta.url));
+process.env.APP_ROOT = path$1.join(__dirname$1, "..");
+const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
+const MAIN_DIST = path$1.join(process.env.APP_ROOT, "dist-electron");
+const RENDERER_DIST = path$1.join(process.env.APP_ROOT, "dist");
+process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path$1.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
+let win;
+const childWindows = /* @__PURE__ */ new Map();
+function getIconsDir() {
+  const iconsDir = path$1.join(app.getPath("userData"), "icons");
+  if (!fs$1.existsSync(iconsDir)) {
+    fs$1.mkdirSync(iconsDir, { recursive: true });
+  }
+  return iconsDir;
 }
-async function _(i, t) {
-  return new Promise((e) => {
+async function downloadIcon(iconUrl, websiteId) {
+  return new Promise((resolve) => {
     try {
-      const o = A(), s = c.extname(new URL(i).pathname) || ".ico", n = c.join(o, `${t}${s}`);
-      if (u.existsSync(n)) {
-        e(n);
+      const iconsDir = getIconsDir();
+      const ext = path$1.extname(new URL(iconUrl).pathname) || ".ico";
+      const iconPath = path$1.join(iconsDir, `${websiteId}${ext}`);
+      if (fs$1.existsSync(iconPath)) {
+        resolve(iconPath);
         return;
       }
-      const r = u.createWriteStream(n), m = (i.startsWith("https") ? R : E).get(i, (p) => {
-        if (p.statusCode === 301 || p.statusCode === 302) {
-          const x = p.headers.location;
-          if (x) {
-            r.close(), u.unlinkSync(n), _(x, t).then(e);
+      const file = fs$1.createWriteStream(iconPath);
+      const protocol = iconUrl.startsWith("https") ? https : http;
+      const request = protocol.get(iconUrl, (response) => {
+        if (response.statusCode === 301 || response.statusCode === 302) {
+          const redirectUrl = response.headers.location;
+          if (redirectUrl) {
+            file.close();
+            fs$1.unlinkSync(iconPath);
+            downloadIcon(redirectUrl, websiteId).then(resolve);
             return;
           }
         }
-        if (p.statusCode !== 200) {
-          r.close(), u.unlinkSync(n), e(null);
+        if (response.statusCode !== 200) {
+          file.close();
+          fs$1.unlinkSync(iconPath);
+          resolve(null);
           return;
         }
-        p.pipe(r), r.on("finish", () => {
-          r.close(), e(n);
+        response.pipe(file);
+        file.on("finish", () => {
+          file.close();
+          resolve(iconPath);
         });
       });
-      m.on("error", () => {
-        r.close(), u.existsSync(n) && u.unlinkSync(n), e(null);
-      }), m.setTimeout(1e4, () => {
-        m.destroy(), r.close(), u.existsSync(n) && u.unlinkSync(n), e(null);
+      request.on("error", () => {
+        file.close();
+        if (fs$1.existsSync(iconPath)) {
+          fs$1.unlinkSync(iconPath);
+        }
+        resolve(null);
       });
-    } catch (o) {
-      console.error("下载图标失败:", o), e(null);
+      request.setTimeout(1e4, () => {
+        request.destroy();
+        file.close();
+        if (fs$1.existsSync(iconPath)) {
+          fs$1.unlinkSync(iconPath);
+        }
+        resolve(null);
+      });
+    } catch (error) {
+      console.error("下载图标失败:", error);
+      resolve(null);
     }
   });
 }
-function C() {
-  a = new v({
+function createWindow() {
+  win = new BrowserWindow({
     width: 1200,
     height: 800,
-    icon: c.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
-    autoHideMenuBar: !0,
+    icon: path$1.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+    autoHideMenuBar: true,
     webPreferences: {
-      preload: c.join(D, "preload.mjs"),
-      webviewTag: !0,
-      contextIsolation: !0,
-      nodeIntegration: !1
+      preload: path$1.join(__dirname$1, "preload.mjs"),
+      webviewTag: true,
+      contextIsolation: true,
+      nodeIntegration: false
     }
-  }), a.webContents.on("before-input-event", (i, t) => {
-    t.key === "F12" ? (a != null && a.webContents.isDevToolsOpened() ? a.webContents.closeDevTools() : a == null || a.webContents.openDevTools(), i.preventDefault()) : t.key === "F5" && (a == null || a.webContents.reload(), i.preventDefault());
-  }), a.webContents.on("did-finish-load", () => {
-    a == null || a.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
-  }), g ? a.loadURL(g) : a.loadFile(c.join(y, "index.html"));
+  });
+  win.webContents.on("before-input-event", (event, input) => {
+    if (input.key === "F12") {
+      if (win == null ? void 0 : win.webContents.isDevToolsOpened()) {
+        win.webContents.closeDevTools();
+      } else {
+        win == null ? void 0 : win.webContents.openDevTools();
+      }
+      event.preventDefault();
+    } else if (input.key === "F5") {
+      win == null ? void 0 : win.webContents.reload();
+      event.preventDefault();
+    }
+  });
+  win.webContents.on("did-finish-load", () => {
+    win == null ? void 0 : win.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
+  });
+  if (VITE_DEV_SERVER_URL) {
+    win.loadURL(VITE_DEV_SERVER_URL);
+  } else {
+    win.loadFile(path$1.join(RENDERER_DIST, "index.html"));
+  }
 }
-function S(i, t, e = "maximized", o) {
-  let s;
-  typeof e == "boolean" ? s = e ? "fullscreen" : "maximized" : s = e;
-  const n = new v({
+function createChildWindow(url, windowId, windowMode = "maximized", websiteName) {
+  let mode;
+  if (typeof windowMode === "boolean") {
+    mode = windowMode ? "fullscreen" : "maximized";
+  } else {
+    mode = windowMode;
+  }
+  const childWin = new BrowserWindow({
     width: 1e3,
     height: 700,
-    show: !1,
+    show: false,
     // 先不显示，等设置好大小后再显示
-    fullscreen: s === "fullscreen",
-    autoHideMenuBar: !0,
+    fullscreen: mode === "fullscreen",
+    autoHideMenuBar: true,
     webPreferences: {
-      preload: c.join(D, "preload.mjs"),
-      webviewTag: !0,
-      contextIsolation: !0,
-      nodeIntegration: !1
+      preload: path$1.join(__dirname$1, "preload.mjs"),
+      webviewTag: true,
+      contextIsolation: true,
+      nodeIntegration: false
     }
   });
-  return s === "maximized" && n.maximize(), n.once("ready-to-show", () => {
-    n.show();
-  }), n.webContents.on("before-input-event", (r, l) => {
-    l.key === "F12" ? (n.webContents.isDevToolsOpened() ? n.webContents.closeDevTools() : n.webContents.openDevTools(), r.preventDefault()) : l.key === "F5" && (n.webContents.reload(), r.preventDefault());
-  }), n.loadURL(i), o && n.setTitle(o), n.webContents.on("page-title-updated", (r) => {
-    o && (r.preventDefault(), n.setTitle(o));
-  }), b.set(t, n), n.on("closed", () => {
-    b.delete(t);
-  }), n;
-}
-function L() {
-  d.handle("get-websites", () => h.getWebsites()), d.handle("add-website", (i, t) => h.addWebsite(t)), d.handle("update-website", (i, t, e) => h.updateWebsite(t, e)), d.handle("delete-website", (i, t) => h.deleteWebsite(t)), d.handle("add-custom-button", (i, t, e) => h.addCustomButton(t, e)), d.handle("update-custom-button", (i, t, e, o) => h.updateCustomButton(t, e, o)), d.handle("delete-custom-button", (i, t, e) => h.deleteCustomButton(t, e)), d.handle("create-window", (i, t, e = "maximized", o) => {
-    const s = Date.now().toString();
-    return S(t, s, e, o), s;
-  }), d.handle("navigate-to-url", (i, t, e) => {
-    const o = b.get(t);
-    o && o.webContents.loadURL(e);
-  }), d.handle("add-to-desktop", async (i, t) => {
-    try {
-      const e = f.getPath("desktop"), o = c.join(e, `${t.name}.lnk`), s = process.execPath;
-      let n = s;
-      if (t.icon) {
-        const l = await _(t.icon, t.id || Date.now().toString());
-        l && (n = l);
+  if (mode === "maximized") {
+    childWin.maximize();
+  }
+  childWin.once("ready-to-show", () => {
+    childWin.show();
+  });
+  childWin.webContents.on("before-input-event", (event, input) => {
+    if (input.key === "F12") {
+      if (childWin.webContents.isDevToolsOpened()) {
+        childWin.webContents.closeDevTools();
+      } else {
+        childWin.webContents.openDevTools();
       }
-      if (W.writeShortcutLink(o, {
-        target: s,
-        args: `--website-url="${t.url}" --website-name="${t.name}"`,
-        description: t.name,
-        icon: n,
+      event.preventDefault();
+    } else if (input.key === "F5") {
+      childWin.webContents.reload();
+      event.preventDefault();
+    }
+  });
+  childWin.loadURL(url);
+  if (websiteName) {
+    childWin.setTitle(websiteName);
+  }
+  childWin.webContents.on("page-title-updated", (event) => {
+    if (websiteName) {
+      event.preventDefault();
+      childWin.setTitle(websiteName);
+    }
+  });
+  childWindows.set(windowId, childWin);
+  childWin.on("closed", () => {
+    childWindows.delete(windowId);
+  });
+  return childWin;
+}
+function setupIpcHandlers() {
+  ipcMain.handle("get-websites", () => {
+    return storageService.getWebsites();
+  });
+  ipcMain.handle("add-website", (_event, website) => {
+    return storageService.addWebsite(website);
+  });
+  ipcMain.handle("update-website", (_event, id, updates) => {
+    return storageService.updateWebsite(id, updates);
+  });
+  ipcMain.handle("delete-website", (_event, id) => {
+    return storageService.deleteWebsite(id);
+  });
+  ipcMain.handle("add-custom-button", (_event, websiteId, button) => {
+    return storageService.addCustomButton(websiteId, button);
+  });
+  ipcMain.handle("update-custom-button", (_event, websiteId, buttonId, updates) => {
+    return storageService.updateCustomButton(websiteId, buttonId, updates);
+  });
+  ipcMain.handle("delete-custom-button", (_event, websiteId, buttonId) => {
+    return storageService.deleteCustomButton(websiteId, buttonId);
+  });
+  ipcMain.handle("create-window", (_event, url, windowMode = "maximized", websiteName) => {
+    const windowId = Date.now().toString();
+    createChildWindow(url, windowId, windowMode, websiteName);
+    return windowId;
+  });
+  ipcMain.handle("navigate-to-url", (_event, windowId, url) => {
+    const childWin = childWindows.get(windowId);
+    if (childWin) {
+      childWin.webContents.loadURL(url);
+    }
+  });
+  ipcMain.handle("add-to-desktop", async (_event, websiteData) => {
+    try {
+      const desktopPath = app.getPath("desktop");
+      const shortcutPath = path$1.join(desktopPath, `${websiteData.name}.lnk`);
+      const exePath = process.execPath;
+      let iconPath = exePath;
+      if (websiteData.icon) {
+        const downloadedIcon = await downloadIcon(websiteData.icon, websiteData.id || Date.now().toString());
+        if (downloadedIcon) {
+          iconPath = downloadedIcon;
+        }
+      }
+      const success = shell.writeShortcutLink(shortcutPath, {
+        target: exePath,
+        args: `--website-url="${websiteData.url}" --website-name="${websiteData.name}"`,
+        description: websiteData.name,
+        icon: iconPath,
         iconIndex: 0
-      }))
-        return { success: !0 };
-      throw new Error("创建快捷方式失败");
-    } catch (e) {
-      throw console.error("添加到桌面失败:", e), e;
+      });
+      if (success) {
+        return { success: true };
+      } else {
+        throw new Error("创建快捷方式失败");
+      }
+    } catch (error) {
+      console.error("添加到桌面失败:", error);
+      throw error;
     }
   });
 }
-f.on("window-all-closed", () => {
-  process.platform !== "darwin" && (f.quit(), a = null);
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+    win = null;
+  }
 });
-f.on("activate", () => {
-  v.getAllWindows().length === 0 && C();
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
 });
-f.whenReady().then(() => {
-  L();
-  const i = process.argv.find((e) => e.startsWith("--website-url=")), t = process.argv.find((e) => e.startsWith("--website-name="));
-  if (i) {
-    const e = i.split("=")[1].replace(/"/g, ""), o = t ? t.split("=")[1].replace(/"/g, "") : void 0, s = Date.now().toString();
-    S(e, s, "maximized", o);
-  } else
-    C();
+app.whenReady().then(() => {
+  setupIpcHandlers();
+  const websiteUrlArg = process.argv.find((arg) => arg.startsWith("--website-url="));
+  const websiteNameArg = process.argv.find((arg) => arg.startsWith("--website-name="));
+  if (websiteUrlArg) {
+    const url = websiteUrlArg.split("=")[1].replace(/"/g, "");
+    const websiteName = websiteNameArg ? websiteNameArg.split("=")[1].replace(/"/g, "") : void 0;
+    const windowId = Date.now().toString();
+    createChildWindow(url, windowId, "maximized", websiteName);
+  } else {
+    createWindow();
+  }
 });
-f.on("second-instance", (i, t) => {
-  const e = t.find((s) => s.startsWith("--website-url=")), o = t.find((s) => s.startsWith("--website-name="));
-  if (e) {
-    const s = e.split("=")[1].replace(/"/g, ""), n = o ? o.split("=")[1].replace(/"/g, "") : void 0, r = Date.now().toString();
-    S(s, r, "maximized", n);
-  } else a && (a.isMinimized() && a.restore(), a.focus());
+app.on("second-instance", (_event, commandLine) => {
+  const websiteUrlArg = commandLine.find((arg) => arg.startsWith("--website-url="));
+  const websiteNameArg = commandLine.find((arg) => arg.startsWith("--website-name="));
+  if (websiteUrlArg) {
+    const url = websiteUrlArg.split("=")[1].replace(/"/g, "");
+    const websiteName = websiteNameArg ? websiteNameArg.split("=")[1].replace(/"/g, "") : void 0;
+    const windowId = Date.now().toString();
+    createChildWindow(url, windowId, "maximized", websiteName);
+  } else if (win) {
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  }
 });
 export {
-  J as MAIN_DIST,
-  y as RENDERER_DIST,
-  g as VITE_DEV_SERVER_URL
+  MAIN_DIST,
+  RENDERER_DIST,
+  VITE_DEV_SERVER_URL
 };
