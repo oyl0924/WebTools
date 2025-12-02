@@ -289,6 +289,8 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
             transition: all 0.2s;
             position: relative;
             -webkit-app-region: no-drag;
+            max-width: 200px;
+            min-width: 80px;
           }
           .tab.active {
             background: #ffffff;
@@ -315,6 +317,13 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
             background: #ff4d4f;
             color: white;
             opacity: 1;
+          }
+          .tab-title {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            user-select: none;
           }
           .new-tab-btn {
             width: 28px;
@@ -660,7 +669,7 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
           const minimizeBtn = document.getElementById('minimizeBtn');
           const maximizeBtn = document.getElementById('maximizeBtn');
           const closeBtn = document.getElementById('closeBtn');
-          const closeTab = document.getElementById('closeTab');
+          const closeTabBtn = document.getElementById('closeTab');
           const newTabBtn = document.getElementById('newTabBtn');
           const currentTab = document.getElementById('currentTab');
 
@@ -684,17 +693,247 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
           });
 
           // 标签页控制（预留功能）
-          closeTab.addEventListener('click', () => {
+          closeTabBtn.addEventListener('click', () => {
             // 暂时关闭整个窗口，后续实现多标签页管理
             if (window.ipcRenderer) {
               window.ipcRenderer.send('window-control', 'close');
             }
           });
 
+          // 标签页管理
+          let tabs = [];
+          let activeTabId = null;
+
+          // 新建标签页功能
           newTabBtn.addEventListener('click', () => {
-            // 预留新标签页功能
-            alert('多标签页功能开发中...');
+            try {
+              const currentUrl = webview.src || '${url}';
+              const currentTitle = currentTab.querySelector('.tab-title').textContent || '新标签页';
+              createNewTab(currentUrl, currentTitle);
+            } catch (error) {
+              console.error('Error creating new tab:', error);
+              // 使用默认URL创建新标签页
+              createNewTab('${url}', '新标签页');
+            }
           });
+
+          // 创建新标签页
+          function createNewTab(url, title) {
+            const tabId = 'tab-' + Date.now();
+            const tabElement = document.createElement('div');
+            tabElement.className = 'tab';
+            tabElement.id = tabId;
+            tabElement.innerHTML = \`
+              <span class="tab-title">\${title || '新标签页'}</span>
+              <span class="tab-close" data-tab-id="\${tabId}">×</span>
+            \`;
+
+            // 在当前标签页之前插入新标签页
+            currentTab.parentNode.insertBefore(tabElement, newTabBtn);
+
+            // 创建新的webview
+            const newWebview = document.createElement('webview');
+            newWebview.id = 'webview-' + tabId;
+            newWebview.style.cssText = 'width: 100%; height: 100%; display: none;';
+            newWebview.setAttribute('nodeintegration', 'false');
+            newWebview.setAttribute('contextIsolation', 'true');
+            newWebview.setAttribute('webpreferences', 'contextIsolation=true,nodeIntegration=false');
+
+            document.querySelector('.webview-container').appendChild(newWebview);
+
+            // 延迟设置src，确保WebView完全附加到DOM
+            setTimeout(() => {
+              if (url && url.startsWith('http')) {
+                newWebview.src = url;
+              } else {
+                console.warn('Invalid URL for new webview:', url);
+                newWebview.src = 'about:blank';
+              }
+            }, 50);
+
+            // 保存标签页信息
+            tabs.push({
+              id: tabId,
+              url: url,
+              title: title || '新标签页',
+              webview: newWebview
+            });
+
+            // 切换到新标签页
+            switchToTab(tabId);
+
+            // 为新标签页添加事件监听
+            setupWebviewListeners(newWebview);
+          }
+
+          // 切换到指定标签页
+          function switchToTab(tabId) {
+            // 隐藏所有标签页和webview
+            document.querySelectorAll('.tab').forEach(tab => {
+              tab.classList.remove('active');
+            });
+            document.querySelectorAll('webview').forEach(wv => {
+              wv.style.display = 'none';
+            });
+
+            // 显示选中的标签页和webview
+            const targetTab = document.getElementById(tabId);
+            if (targetTab) {
+              targetTab.classList.add('active');
+            }
+
+            let targetWebview;
+            if (tabId === 'default') {
+              targetWebview = webview;
+            } else {
+              targetWebview = document.getElementById('webview-' + tabId);
+            }
+
+            if (targetWebview) {
+              targetWebview.style.display = 'block';
+              // 更新当前活动的webview引用
+              window.currentWebview = targetWebview;
+
+              // 延迟更新UI，确保WebView完全显示
+              setTimeout(() => {
+                // 更新URL显示
+                urlDisplay.textContent = targetWebview.src;
+                urlDisplay.title = targetWebview.src;
+                // 更新导航按钮状态
+                updateNavButtons();
+              }, 100);
+            }
+
+            activeTabId = tabId;
+          }
+
+          // 为webview添加事件监听
+          function setupWebviewListeners(wv) {
+            wv.addEventListener('dom-ready', () => {
+              if (wv === window.currentWebview) {
+                urlDisplay.textContent = wv.src;
+                urlDisplay.title = wv.src;
+                updateNavButtons();
+              }
+            });
+
+            wv.addEventListener('did-navigate', () => {
+              if (wv === window.currentWebview) {
+                urlDisplay.textContent = wv.src;
+                urlDisplay.title = wv.src;
+                updateNavButtons();
+              }
+            });
+
+            // 处理新窗口打开请求（target="_blank"）
+            wv.addEventListener('new-window', (event) => {
+              event.preventDefault();
+              try {
+                const newUrl = event.url;
+                if (newUrl && newUrl.startsWith('http')) {
+                  const currentTitle = wv.getTitle() || '新标签页';
+                  createNewTab(newUrl, currentTitle);
+                } else {
+                  console.warn('Invalid URL for new window:', newUrl);
+                }
+              } catch (error) {
+                console.error('Error handling new-window event:', error);
+              }
+            });
+
+            // 处理页面标题更新
+            wv.addEventListener('page-title-updated', (event) => {
+              const tabId = wv.id.replace('webview-', '');
+              const tab = document.getElementById(tabId);
+              if (tab) {
+                const titleElement = tab.querySelector('.tab-title');
+                if (titleElement) {
+                  titleElement.textContent = event.title || '新标签页';
+                }
+              }
+
+              // 更新存储的标签页信息
+              const tabInfo = tabs.find(t => t.id === tabId);
+              if (tabInfo) {
+                tabInfo.title = event.title || '新标签页';
+              }
+            });
+          }
+
+          // 更新导航按钮状态
+          function updateNavButtons() {
+            const currentWv = window.currentWebview || webview;
+            if (currentWv && currentWv.getWebContentsId) {
+              try {
+                backBtn.disabled = !currentWv.canGoBack();
+                forwardBtn.disabled = !currentWv.canGoForward();
+              } catch (error) {
+                // WebView还未准备好，设置为默认状态
+                backBtn.disabled = true;
+                forwardBtn.disabled = true;
+              }
+            } else {
+              // WebView还未附加到DOM
+              backBtn.disabled = true;
+              forwardBtn.disabled = true;
+            }
+          }
+
+          // 标签页点击事件委托
+          document.addEventListener('click', (e) => {
+            // 标签页点击切换
+            if (e.target.closest('.tab') && !e.target.classList.contains('tab-close')) {
+              const tab = e.target.closest('.tab');
+              const tabId = tab.id;
+              if (tabs.find(t => t.id === tabId)) {
+                switchToTab(tabId);
+              }
+            }
+
+            // 标签页关闭按钮
+            if (e.target.classList.contains('tab-close')) {
+              const tabId = e.target.getAttribute('data-tab-id');
+              closeTab(tabId);
+            }
+          });
+
+          // 关闭标签页
+          function closeTab(tabId) {
+            if (tabId === 'default') {
+              // 不能关闭默认标签页，改为关闭整个窗口
+              if (window.ipcRenderer) {
+                window.ipcRenderer.send('window-control', 'close');
+              }
+              return;
+            }
+
+            const tabIndex = tabs.findIndex(t => t.id === tabId);
+            if (tabIndex === -1) return;
+
+            const tabInfo = tabs[tabIndex];
+
+            // 移除标签页元素
+            const tabElement = document.getElementById(tabId);
+            if (tabElement) {
+              tabElement.remove();
+            }
+
+            // 移除webview元素
+            if (tabInfo.webview) {
+              tabInfo.webview.remove();
+            }
+
+            // 从数组中移除
+            tabs.splice(tabIndex, 1);
+
+            // 如果关闭的是当前活动标签页，切换到其他标签页
+            if (activeTabId === tabId) {
+              const newActiveTab = tabs[tabIndex] || tabs[tabIndex - 1] || tabs[0];
+              if (newActiveTab) {
+                switchToTab(newActiveTab.id);
+              }
+            }
+          }
 
           // 监听窗口状态变化，更新最大化按钮图标
           if (window.ipcRenderer) {
@@ -713,20 +952,50 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
           }
 
 
-          // 更新URL显示和按钮状态
-          webview.addEventListener('dom-ready', () => {
-            urlDisplay.textContent = webview.src;
-            urlDisplay.title = webview.src;
-            backBtn.disabled = !webview.canGoBack();
-            forwardBtn.disabled = !webview.canGoForward();
+          // 当前活动的webview引用
+          window.currentWebview = webview;
+
+          // 导航按钮事件 - 作用于当前活动的webview
+          backBtn.addEventListener('click', () => {
+            const currentWv = window.currentWebview;
+            if (currentWv && currentWv.canGoBack()) {
+              currentWv.goBack();
+            }
           });
 
-          webview.addEventListener('did-navigate', () => {
-            urlDisplay.textContent = webview.src;
-            urlDisplay.title = webview.src;
-            backBtn.disabled = !webview.canGoBack();
-            forwardBtn.disabled = !webview.canGoForward();
+          forwardBtn.addEventListener('click', () => {
+            const currentWv = window.currentWebview;
+            if (currentWv && currentWv.canGoForward()) {
+              currentWv.goForward();
+            }
           });
+
+          homeBtn.addEventListener('click', () => {
+            const currentWv = window.currentWebview;
+            if (currentWv) {
+              currentWv.src = '${url}';
+            }
+          });
+
+          refreshBtn.addEventListener('click', () => {
+            const currentWv = window.currentWebview;
+            if (currentWv) {
+              currentWv.reload();
+            }
+          });
+
+          switchBtn.addEventListener('click', () => {
+            const currentWv = window.currentWebview;
+            if (currentWv && currentWv.src) {
+              // 使用shell打开默认浏览器
+              if (window.ipcRenderer) {
+                window.ipcRenderer.send('open-external', currentWv.src);
+              }
+            }
+          });
+
+          // 为默认webview添加事件监听
+          setupWebviewListeners(webview);
 
           // 监听来自父窗口的消息
           window.addEventListener('message', (event) => {
@@ -769,6 +1038,15 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
 
           // 初始化时向父窗口请求自定义按钮数据
           window.parent.postMessage({ type: 'requestCustomButtons' }, '*');
+
+          // 初始化默认标签页
+          tabs.push({
+            id: 'default',
+            url: '${url}',
+            title: '${websiteName || '新标签页'}',
+            webview: webview
+          });
+          activeTabId = 'default';
         </script>
       </body>
     </html>
@@ -1364,6 +1642,13 @@ function setupIpcHandlers() {
           break
       }
     }
+  })
+
+  // 打开外部链接
+  ipcMain.on('open-external', (_event, url) => {
+    shell.openExternal(url).catch(err => {
+      console.error('打开外部链接失败:', err)
+    })
   })
 }
 
