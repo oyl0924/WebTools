@@ -592,7 +592,7 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
           <!-- 自定义标题栏 -->
           <div class="title-bar">
             <div class="title-bar-tabs">
-              <div class="tab active" id="currentTab">
+              <div class="tab active" id="default">
                 <span class="tab-title">${websiteName || '新标签页'}</span>
                 <span class="tab-close" id="closeTab">×</span>
               </div>
@@ -655,7 +655,7 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
             </div>
           </div>
           <div class="webview-container">
-            <webview id="webview" src="${url}" nodeintegration="false" contextIsolation="true" webpreferences="contextIsolation=true,nodeIntegration=false"></webview>
+            <webview id="webview" src="${url}" nodeintegration="false" contextIsolation="true" webpreferences="contextIsolation=true,nodeIntegration=false" allowpopups="true" webSecurity="true"></webview>
           </div>
         </div>
         <script>
@@ -671,7 +671,7 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
           const closeBtn = document.getElementById('closeBtn');
           const closeTabBtn = document.getElementById('closeTab');
           const newTabBtn = document.getElementById('newTabBtn');
-          const currentTab = document.getElementById('currentTab');
+          const currentTab = document.getElementById('default');
 
           // 窗口控制功能 - 使用预加载的ipcRenderer
           minimizeBtn.addEventListener('click', () => {
@@ -692,12 +692,9 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
             }
           });
 
-          // 标签页控制（预留功能）
+          // 默认标签页的关闭按钮事件
           closeTabBtn.addEventListener('click', () => {
-            // 暂时关闭整个窗口，后续实现多标签页管理
-            if (window.ipcRenderer) {
-              window.ipcRenderer.send('window-control', 'close');
-            }
+            closeTab('default'); // 使用统一的标签页关闭函数
           });
 
           // 标签页管理
@@ -707,9 +704,9 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
           // 新建标签页功能
           newTabBtn.addEventListener('click', () => {
             try {
-              const currentUrl = webview.src || '${url}';
-              const currentTitle = currentTab.querySelector('.tab-title').textContent || '新标签页';
-              createNewTab(currentUrl, currentTitle);
+              // 使用首页URL创建新标签页，而不是当前URL
+              const homeUrl = '${url}';
+              createNewTab(homeUrl, '新标签页');
             } catch (error) {
               console.error('Error creating new tab:', error);
               // 使用默认URL创建新标签页
@@ -728,8 +725,17 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
               <span class="tab-close" data-tab-id="\${tabId}">×</span>
             \`;
 
-            // 在当前标签页之前插入新标签页
-            currentTab.parentNode.insertBefore(tabElement, newTabBtn);
+            // 在新标签页按钮之前插入新标签页
+            const newTabBtn = document.getElementById('newTabBtn');
+            if (newTabBtn && newTabBtn.parentNode) {
+              newTabBtn.parentNode.insertBefore(tabElement, newTabBtn);
+            } else {
+              // 如果找不到新标签页按钮，插入到标题栏标签容器中
+              const titleBarTabs = document.querySelector('.title-bar-tabs');
+              if (titleBarTabs) {
+                titleBarTabs.appendChild(tabElement);
+              }
+            }
 
             // 创建新的webview
             const newWebview = document.createElement('webview');
@@ -738,6 +744,8 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
             newWebview.setAttribute('nodeintegration', 'false');
             newWebview.setAttribute('contextIsolation', 'true');
             newWebview.setAttribute('webpreferences', 'contextIsolation=true,nodeIntegration=false');
+            newWebview.setAttribute('allowpopups', 'true'); // 明确设置为true以允许弹出窗口被拦截
+            newWebview.setAttribute('webSecurity', 'true'); // 启用Web安全
 
             document.querySelector('.webview-container').appendChild(newWebview);
 
@@ -790,7 +798,8 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
             }
 
             if (targetWebview) {
-              targetWebview.style.display = 'block';
+              // 取消使用 display:block，避免高度异常问题
+              targetWebview.style.display = '';
               // 更新当前活动的webview引用
               window.currentWebview = targetWebview;
 
@@ -828,11 +837,26 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
             // 处理新窗口打开请求（target="_blank"）
             wv.addEventListener('new-window', (event) => {
               event.preventDefault();
+              console.log('new-window event intercepted:', event.url);
               try {
                 const newUrl = event.url;
-                if (newUrl && newUrl.startsWith('http')) {
-                  const currentTitle = wv.getTitle() || '新标签页';
-                  createNewTab(newUrl, currentTitle);
+                if (newUrl && (newUrl.startsWith('http') || newUrl.startsWith('https'))) {
+                  // 尝试从URL获取页面标题，或者使用当前页面标题
+                  let pageTitle = wv.getTitle() || '新标签页';
+                  // 如果是同域名下的链接，尝试从URL路径提取更友好的标题
+                  try {
+                    const urlObj = new URL(newUrl);
+                    const pathSegments = urlObj.pathname.split('/').filter(segment => segment);
+                    if (pathSegments.length > 0) {
+                      pageTitle = pathSegments[pathSegments.length - 1] || pageTitle;
+                      // 简单的标题格式化
+                      pageTitle = pageTitle.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    }
+                  } catch (e) {
+                    // URL解析失败，使用默认标题
+                  }
+                  console.log('Creating new tab with URL:', newUrl, 'Title:', pageTitle);
+                  createNewTab(newUrl, pageTitle);
                 } else {
                   console.warn('Invalid URL for new window:', newUrl);
                 }
@@ -899,14 +923,6 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
 
           // 关闭标签页
           function closeTab(tabId) {
-            if (tabId === 'default') {
-              // 不能关闭默认标签页，改为关闭整个窗口
-              if (window.ipcRenderer) {
-                window.ipcRenderer.send('window-control', 'close');
-              }
-              return;
-            }
-
             const tabIndex = tabs.findIndex(t => t.id === tabId);
             if (tabIndex === -1) return;
 
@@ -925,6 +941,13 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
 
             // 从数组中移除
             tabs.splice(tabIndex, 1);
+
+            // 如果关闭后没有标签页了，创建一个新的默认标签页
+            if (tabs.length === 0) {
+              const homeUrl = '${url}';
+              createNewTab(homeUrl, '新标签页');
+              return;
+            }
 
             // 如果关闭的是当前活动标签页，切换到其他标签页
             if (activeTabId === tabId) {
