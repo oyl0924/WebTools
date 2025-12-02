@@ -29,6 +29,32 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 let win: BrowserWindow | null
 const childWindows: Map<string, BrowserWindow> = new Map()
 
+// 同步窗口最大化/还原状态到渲染进程（用于更新标题栏图标）
+function setupWindowStateSync(targetWindow: BrowserWindow) {
+  // 任意方式最大化/还原时，都通知前端更新图标
+  targetWindow.on('maximize', () => {
+    targetWindow.webContents.send('window-state-changed', true)
+  })
+
+  targetWindow.on('unmaximize', () => {
+    targetWindow.webContents.send('window-state-changed', false)
+  })
+
+  targetWindow.on('enter-full-screen', () => {
+    targetWindow.webContents.send('window-state-changed', true)
+  })
+
+  targetWindow.on('leave-full-screen', () => {
+    targetWindow.webContents.send('window-state-changed', false)
+  })
+
+  // 首次页面加载完成后，同步一次当前窗口状态
+  targetWindow.webContents.on('did-finish-load', () => {
+    const isMaximizedOrFull = targetWindow.isMaximized() || targetWindow.isFullScreen()
+    targetWindow.webContents.send('window-state-changed', isMaximizedOrFull)
+  })
+}
+
 // 获取图标存储目录
 function getIconsDir() {
   const iconsDir = path.join(app.getPath('userData'), 'icons')
@@ -126,6 +152,9 @@ async function createWindow() {
     },
   })
 
+  // 同步窗口状态到渲染进程（用于更新标题栏图标）
+  setupWindowStateSync(win)
+
   // 根据设置调整窗口大小
   if (savedSettings.homeWindowSize === 'maximized') {
     win.maximize()
@@ -211,6 +240,12 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
       nodeIntegration: false
     },
   })
+
+  // 标记当前子窗口对应的网站初始 URL，方便后续同步自定义按钮等
+  ;(childWin as any).__websiteUrl = url
+
+  // 同步窗口状态到渲染进程（用于更新标题栏图标）
+  setupWindowStateSync(childWin)
 
   // 根据窗口模式设置窗口状态
   if (mode === 'maximized') {
@@ -861,7 +896,9 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
 
             // 处理页面标题更新
             wv.addEventListener('page-title-updated', (event) => {
-              const tabId = wv.id.replace('webview-', '');
+              // 默认标签页的 webview.id 是 'webview'，需要特殊处理成 'default'
+              const rawId = wv.id || '';
+              const tabId = rawId === 'webview' ? 'default' : rawId.replace('webview-', '');
               const tab = document.getElementById(tabId);
               if (tab) {
                 const titleElement = tab.querySelector('.tab-title');
@@ -908,11 +945,27 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
               }
             }
 
-            // 标签页关闭按钮
+            // 标签页关闭按钮（左键点击关闭图标）
             if (e.target.classList.contains('tab-close')) {
               const tabId = e.target.getAttribute('data-tab-id');
               closeTab(tabId);
             }
+          });
+
+          // 标签页鼠标中键关闭功能
+          document.addEventListener('auxclick', (e) => {
+            // 仅处理中键（button === 1）
+            if (e.button !== 1) return;
+
+            const tabElement = e.target.closest('.tab');
+            if (!tabElement) return;
+
+            // 默认标签页也允许通过中键关闭时重新创建一个新标签页
+            const tabId = tabElement.id;
+            if (!tabId) return;
+
+            // 如果是默认标签页，交给 closeTab 统一处理（其中会自动创建新标签页）
+            closeTab(tabId);
           });
 
           // 关闭标签页
@@ -1048,7 +1101,20 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
                 btn.style.cssText = 'font-size: 12px; padding: 2px 8px; height: 24px;';
                 btn.addEventListener('click', () => {
                   if (button.openMode === 'currentPage') {
+                    // 在当前标签页中打开
                     webview.src = button.url;
+                  } else if (button.openMode === 'newTab') {
+                    // 在当前子窗口中新建标签页打开
+                    try {
+                      createNewTab(button.url, button.name || '新标签页');
+                    } catch (error) {
+                      console.error('createNewTab failed, fallback to new window:', error);
+                      window.parent.postMessage({
+                        type: 'openNewWindow',
+                        url: button.url,
+                        name: button.name
+                      }, '*');
+                    }
                   } else {
                     // 新窗口打开
                     window.parent.postMessage({
@@ -1677,6 +1743,32 @@ function setupIpcHandlers() {
     shell.openExternal(url).catch(err => {
       console.error('打开外部链接失败:', err)
     })
+  })
+
+  // 自定义按钮更新后，通知相关子窗口刷新顶部自定义按钮区域
+  ipcMain.on('custom-buttons-updated', (_event, websiteId: string) => {
+    try {
+      const websites = storageService.getWebsites()
+      const website = websites.find(w => w.id === websiteId)
+      if (!website) return
+
+      const buttons = website.customButtons || []
+
+      // 遍历所有子窗口，找到初始 URL 匹配的网站窗口并推送最新按钮配置
+      childWindows.forEach((childWin) => {
+        const websiteUrl = (childWin as any).__websiteUrl as string | undefined
+        if (!websiteUrl || websiteUrl !== website.url) return
+
+        childWin.webContents.executeJavaScript(`
+          window.postMessage({
+            type: 'updateCustomButtons',
+            buttons: ${JSON.stringify(buttons)}
+          }, '*');
+        `)
+      })
+    } catch (error) {
+      console.error('同步自定义按钮到子窗口失败:', error)
+    }
   })
 }
 

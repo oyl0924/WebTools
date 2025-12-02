@@ -74,6 +74,12 @@ const handleDeleteButton = (button: CustomButton) => {
       try {
         await window.ipcRenderer.invoke('delete-custom-button', props.website.id, button.id)
         message.success('删除成功')
+
+        // 通知主进程该网站的自定义按钮已更新，用于同步到已打开的子窗口
+        if (window.ipcRenderer) {
+          window.ipcRenderer.send('custom-buttons-updated', props.website.id)
+        }
+
         emit('success')
       } catch (error) {
         message.error('删除失败')
@@ -107,6 +113,11 @@ const handleSubmitButton = async () => {
       // 添加按钮
       await window.ipcRenderer.invoke('add-custom-button', props.website.id, buttonData)
       message.success('添加成功')
+    }
+
+    // 通知主进程该网站的自定义按钮已更新，用于同步到已打开的子窗口
+    if (window.ipcRenderer) {
+      window.ipcRenderer.send('custom-buttons-updated', props.website.id)
     }
 
     showButtonForm.value = false

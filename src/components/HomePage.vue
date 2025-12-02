@@ -221,7 +221,7 @@ const loadSettingsAndApplyTheme = async () => {
 
     <!-- 搜索框 -->
     <div class="search-bar">
-      <a-input-search
+      <a-input
         ref="searchInputRef"
         v-model:value="searchText"
         placeholder="搜索网站..."

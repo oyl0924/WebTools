@@ -117,6 +117,12 @@ const addToDesktop = async () => {
 const openCustomButtonModal = () => {
   showCustomButtonModal.value = true
 }
+
+// 自定义按钮修改成功回调
+const handleCustomButtonSuccess = () => {
+  showCustomButtonModal.value = false
+  emit('success')
+}
 </script>
 
 <template>
@@ -207,7 +213,7 @@ const openCustomButtonModal = () => {
     v-if="props.website"
     v-model:open="showCustomButtonModal"
     :website="props.website"
-    @success="handleClose"
+    @success="handleCustomButtonSuccess"
   />
 </template>
 

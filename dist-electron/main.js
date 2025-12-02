@@ -209,6 +209,24 @@ const RENDERER_DIST = path$1.join(process.env.APP_ROOT, "dist");
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path$1.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
 let win;
 const childWindows = /* @__PURE__ */ new Map();
+function setupWindowStateSync(targetWindow) {
+  targetWindow.on("maximize", () => {
+    targetWindow.webContents.send("window-state-changed", true);
+  });
+  targetWindow.on("unmaximize", () => {
+    targetWindow.webContents.send("window-state-changed", false);
+  });
+  targetWindow.on("enter-full-screen", () => {
+    targetWindow.webContents.send("window-state-changed", true);
+  });
+  targetWindow.on("leave-full-screen", () => {
+    targetWindow.webContents.send("window-state-changed", false);
+  });
+  targetWindow.webContents.on("did-finish-load", () => {
+    const isMaximizedOrFull = targetWindow.isMaximized() || targetWindow.isFullScreen();
+    targetWindow.webContents.send("window-state-changed", isMaximizedOrFull);
+  });
+}
 function getIconsDir() {
   const iconsDir = path$1.join(app.getPath("userData"), "icons");
   if (!fs$1.existsSync(iconsDir)) {
@@ -291,6 +309,7 @@ async function createWindow() {
       nodeIntegration: false
     }
   });
+  setupWindowStateSync(win);
   if (savedSettings.homeWindowSize === "maximized") {
     win.maximize();
   } else if (savedSettings.homeWindowSize === "fullscreen") {
@@ -360,6 +379,8 @@ async function createChildWindow(url, windowId, windowMode = "maximized", websit
       nodeIntegration: false
     }
   });
+  childWin.__websiteUrl = url;
+  setupWindowStateSync(childWin);
   if (mode === "maximized") {
     childWin.maximize();
   }
@@ -994,7 +1015,9 @@ async function createChildWindow(url, windowId, windowMode = "maximized", websit
 
             // 处理页面标题更新
             wv.addEventListener('page-title-updated', (event) => {
-              const tabId = wv.id.replace('webview-', '');
+              // 默认标签页的 webview.id 是 'webview'，需要特殊处理成 'default'
+              const rawId = wv.id || '';
+              const tabId = rawId === 'webview' ? 'default' : rawId.replace('webview-', '');
               const tab = document.getElementById(tabId);
               if (tab) {
                 const titleElement = tab.querySelector('.tab-title');
@@ -1041,11 +1064,27 @@ async function createChildWindow(url, windowId, windowMode = "maximized", websit
               }
             }
 
-            // 标签页关闭按钮
+            // 标签页关闭按钮（左键点击关闭图标）
             if (e.target.classList.contains('tab-close')) {
               const tabId = e.target.getAttribute('data-tab-id');
               closeTab(tabId);
             }
+          });
+
+          // 标签页鼠标中键关闭功能
+          document.addEventListener('auxclick', (e) => {
+            // 仅处理中键（button === 1）
+            if (e.button !== 1) return;
+
+            const tabElement = e.target.closest('.tab');
+            if (!tabElement) return;
+
+            // 默认标签页也允许通过中键关闭时重新创建一个新标签页
+            const tabId = tabElement.id;
+            if (!tabId) return;
+
+            // 如果是默认标签页，交给 closeTab 统一处理（其中会自动创建新标签页）
+            closeTab(tabId);
           });
 
           // 关闭标签页
@@ -1181,7 +1220,20 @@ async function createChildWindow(url, windowId, windowMode = "maximized", websit
                 btn.style.cssText = 'font-size: 12px; padding: 2px 8px; height: 24px;';
                 btn.addEventListener('click', () => {
                   if (button.openMode === 'currentPage') {
+                    // 在当前标签页中打开
                     webview.src = button.url;
+                  } else if (button.openMode === 'newTab') {
+                    // 在当前子窗口中新建标签页打开
+                    try {
+                      createNewTab(button.url, button.name || '新标签页');
+                    } catch (error) {
+                      console.error('createNewTab failed, fallback to new window:', error);
+                      window.parent.postMessage({
+                        type: 'openNewWindow',
+                        url: button.url,
+                        name: button.name
+                      }, '*');
+                    }
                   } else {
                     // 新窗口打开
                     window.parent.postMessage({
@@ -1725,6 +1777,26 @@ function setupIpcHandlers() {
     shell.openExternal(url).catch((err) => {
       console.error("打开外部链接失败:", err);
     });
+  });
+  ipcMain.on("custom-buttons-updated", (_event, websiteId) => {
+    try {
+      const websites = storageService.getWebsites();
+      const website = websites.find((w) => w.id === websiteId);
+      if (!website) return;
+      const buttons = website.customButtons || [];
+      childWindows.forEach((childWin) => {
+        const websiteUrl = childWin.__websiteUrl;
+        if (!websiteUrl || websiteUrl !== website.url) return;
+        childWin.webContents.executeJavaScript(`
+          window.postMessage({
+            type: 'updateCustomButtons',
+            buttons: ${JSON.stringify(buttons)}
+          }, '*');
+        `);
+      });
+    } catch (error) {
+      console.error("同步自定义按钮到子窗口失败:", error);
+    }
   });
 }
 app.on("window-all-closed", () => {
