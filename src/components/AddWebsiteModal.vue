@@ -88,6 +88,7 @@ const autoGetIcon = () => {
     :open="props.open"
     title="添加网站"
     :width="600"
+    centered
     @cancel="handleClose"
     @ok="handleSubmit"
   >
@@ -153,3 +154,4 @@ const autoGetIcon = () => {
 
 <style scoped>
 </style>
+

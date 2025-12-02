@@ -69,6 +69,8 @@ const handleDelete = () => {
     okText: '确定',
     cancelText: '取消',
     okType: 'danger',
+    centered: true,
+    maskClosable: true,
     onOk: async () => {
       try {
         await window.ipcRenderer.invoke('delete-website', props.website.id)
@@ -158,6 +160,7 @@ const handleCustomButtonSuccess = () => {
     :open="open"
     title="编辑网站"
     :width="600"
+    centered
     @cancel="handleClose"
     @ok="handleSubmit"
   >
@@ -253,5 +256,7 @@ const handleCustomButtonSuccess = () => {
 
 <style scoped>
 </style>
+
+
 
 

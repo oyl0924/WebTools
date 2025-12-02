@@ -160,6 +160,7 @@ onMounted(() => {
     :open="props.open"
     title="设置"
     :width="600"
+    centered
     @cancel="handleClose"
     @ok="saveSettings"
   >

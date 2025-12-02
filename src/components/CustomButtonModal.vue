@@ -136,110 +136,113 @@ const handleCancelButtonForm = () => {
 
 <template>
   <a-modal
-    :open="open"
-    :title="`管理自定义按钮 - ${website.name}`"
-    :width="700"
+    :open="props.open"
+    title="自定义按钮管理"
+    :width="800"
+    centered
     @cancel="handleClose"
-    :footer="null"
   >
-    <div class="button-manager">
-      <!-- 按钮列表 -->
-      <div class="button-list">
-        <a-button 
-          type="dashed" 
-          block 
-          @click="handleAddButton"
-          style="margin-bottom: 16px"
-        >
-          <PlusOutlined /> 添加按钮
-        </a-button>
+    <template #footer>
+      <div class="button-manager">
+        <!-- 按钮列表 -->
+        <div class="button-list">
+          <a-button 
+            type="dashed" 
+            block 
+            @click="handleAddButton"
+            style="margin-bottom: 16px"
+          >
+            <PlusOutlined /> 添加按钮
+          </a-button>
 
-        <a-list
-          v-if="website.customButtons && website.customButtons.length > 0"
-          :data-source="website.customButtons"
-          :grid="{ gutter: 16, column: 2 }"
-        >
-          <template #renderItem="{ item }">
-            <a-list-item>
-              <a-card>
-                <template #title>
-                  {{ item.name }}
-                </template>
-                <template #extra>
-                  <a-space>
-                    <a-button 
-                      type="link" 
-                      size="small"
-                      @click="handleEditButton(item)"
-                    >
-                      <EditOutlined />
-                    </a-button>
-                    <a-button 
-                      type="link" 
-                      danger 
-                      size="small"
-                      @click="handleDeleteButton(item)"
-                    >
-                      <DeleteOutlined />
-                    </a-button>
-                  </a-space>
-                </template>
-                <p class="button-url">{{ item.url }}</p>
-                <a-tag>
-                  {{ OPEN_MODE_OPTIONS.find(o => o.value === item.openMode)?.label }}
-                </a-tag>
-              </a-card>
-            </a-list-item>
-          </template>
-        </a-list>
+          <a-list
+            v-if="website.customButtons && website.customButtons.length > 0"
+            :data-source="website.customButtons"
+            :grid="{ gutter: 16, column: 2 }"
+          >
+            <template #renderItem="{ item }">
+              <a-list-item>
+                <a-card>
+                  <template #title>
+                    {{ item.name }}
+                  </template>
+                  <template #extra>
+                    <a-space>
+                      <a-button 
+                        type="link" 
+                        size="small"
+                        @click="handleEditButton(item)"
+                      >
+                        <EditOutlined />
+                      </a-button>
+                      <a-button 
+                        type="link" 
+                        danger 
+                        size="small"
+                        @click="handleDeleteButton(item)"
+                      >
+                        <DeleteOutlined />
+                      </a-button>
+                    </a-space>
+                  </template>
+                  <p class="button-url">{{ item.url }}</p>
+                  <a-tag>
+                    {{ OPEN_MODE_OPTIONS.find(o => o.value === item.openMode)?.label }}
+                  </a-tag>
+                </a-card>
+              </a-list-item>
+            </template>
+          </a-list>
 
-        <a-empty 
-          v-else 
-          description="暂无自定义按钮"
-          style="margin-top: 40px"
-        />
+          <a-empty 
+            v-else 
+            description="暂无自定义按钮"
+            style="margin-top: 40px"
+          />
+        </div>
+
+        <!-- 按钮表单弹窗 -->
+        <a-modal
+          :open="showButtonForm"
+          :title="editingButton ? '编辑按钮' : '添加按钮'"
+          :width="500"
+          centered
+          @cancel="handleCancelButtonForm"
+          @ok="handleSubmitButton"
+        >
+          <a-form
+            ref="formRef"
+            :model="formState"
+            :rules="rules"
+            :label-col="{ span: 6 }"
+            :wrapper-col="{ span: 18 }"
+          >
+            <a-form-item label="按钮名称" name="name">
+              <a-input v-model:value="formState.name" placeholder="请输入按钮名称" />
+            </a-form-item>
+
+            <a-form-item label="网址" name="url">
+              <a-input 
+                v-model:value="formState.url" 
+                placeholder="请输入网址"
+              />
+            </a-form-item>
+
+            <a-form-item label="打开方式" name="openMode">
+              <a-select v-model:value="formState.openMode">
+                <a-select-option
+                  v-for="option in OPEN_MODE_OPTIONS"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-form>
+        </a-modal>
       </div>
-
-      <!-- 按钮表单弹窗 -->
-      <a-modal
-        :open="showButtonForm"
-        :title="editingButton ? '编辑按钮' : '添加按钮'"
-        :width="500"
-        @cancel="handleCancelButtonForm"
-        @ok="handleSubmitButton"
-      >
-        <a-form
-          ref="formRef"
-          :model="formState"
-          :rules="rules"
-          :label-col="{ span: 6 }"
-          :wrapper-col="{ span: 18 }"
-        >
-          <a-form-item label="按钮名称" name="name">
-            <a-input v-model:value="formState.name" placeholder="请输入按钮名称" />
-          </a-form-item>
-
-          <a-form-item label="网址" name="url">
-            <a-input 
-              v-model:value="formState.url" 
-              placeholder="请输入网址"
-            />
-          </a-form-item>
-
-          <a-form-item label="打开方式" name="openMode">
-            <a-select v-model:value="formState.openMode">
-              <a-select-option
-                v-for="option in OPEN_MODE_OPTIONS"
-                :key="option.value"
-                :value="option.value"
-              >
-                {{ option.label }}
-              </a-select-option>
-            </a-select>
-          </a-form-item>
-        </a-form>
-      </a-modal>
-    </div>
+    </template>
   </a-modal>
 </template>
 
@@ -256,3 +259,4 @@ const handleCancelButtonForm = () => {
   margin-bottom: 8px;
 }
 </style>
+

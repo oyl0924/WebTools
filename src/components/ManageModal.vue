@@ -288,11 +288,12 @@ watch(() => props.open, handleOpenChange)
 
 <template>
   <a-modal
-    :open="open"
+    :open="props.open"
     title="网站管理"
-    :footer="null"
     :width="900"
+    centered
     @cancel="handleClose"
+    :footer="null"
   >
     <template #closeIcon>
       <CloseOutlined />
@@ -435,3 +436,4 @@ watch(() => props.open, handleOpenChange)
   border-radius: 4px;
 }
 </style>
+
