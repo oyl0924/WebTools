@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue'
-import { message } from 'ant-design-vue'
-import { DesktopOutlined, SettingOutlined } from '@ant-design/icons-vue'
+import { message, Modal } from 'ant-design-vue'
+import { DesktopOutlined, SettingOutlined, DeleteOutlined } from '@ant-design/icons-vue'
 import type { Website } from '../types'
 import CustomButtonModal from './CustomButtonModal.vue'
 
@@ -24,7 +24,9 @@ const formState = reactive({
   name: '',
   url: '',
   icon: '',
-  windowMode: 'maximized' as 'normal' | 'maximized' | 'fullscreen'
+  windowMode: 'maximized' as 'normal' | 'maximized' | 'fullscreen',
+  width: 1000,
+  height: 700
 })
 
 const rules = {
@@ -49,12 +51,36 @@ watch(() => props.website, (newVal) => {
     } else {
       formState.windowMode = newVal.fullscreen ? 'fullscreen' : 'maximized'
     }
+    formState.width = newVal.width || 1000
+    formState.height = newVal.height || 700
   }
 }, { immediate: true })
 
 // 关闭弹窗
 const handleClose = () => {
   emit('update:open', false)
+}
+
+// 删除网站
+const handleDelete = () => {
+  Modal.confirm({
+    title: '确认删除',
+    content: `确定要删除网站 "${props.website.name}" 吗？`,
+    okText: '确定',
+    cancelText: '取消',
+    okType: 'danger',
+    onOk: async () => {
+      try {
+        await window.ipcRenderer.invoke('delete-website', props.website.id)
+        message.success('删除成功')
+        emit('success')
+        handleClose()
+      } catch (error) {
+        message.error('删除失败')
+        console.error(error)
+      }
+    }
+  })
 }
 
 // 提交表单
@@ -66,7 +92,9 @@ const handleSubmit = async () => {
       name: formState.name,
       url: formState.url,
       icon: formState.icon,
-      windowMode: formState.windowMode
+      windowMode: formState.windowMode,
+      width: formState.width,
+      height: formState.height
     }
 
     await window.ipcRenderer.invoke('update-website', props.website.id, updates)
@@ -146,6 +174,12 @@ const handleCustomButtonSuccess = () => {
         </template>
         自定义按钮
       </a-button>
+      <a-button danger @click="handleDelete">
+        <template #icon>
+          <DeleteOutlined />
+        </template>
+        删除
+      </a-button>
       <a-button @click="handleClose">取消</a-button>
       <a-button type="primary" @click="handleSubmit">确定</a-button>
     </template>
@@ -219,3 +253,5 @@ const handleCustomButtonSuccess = () => {
 
 <style scoped>
 </style>
+
+

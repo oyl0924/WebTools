@@ -201,7 +201,7 @@ class SettingsService {
   }
 }
 const settingsService = new SettingsService();
-function buildChildWindowHtml(url, websiteName) {
+function buildChildWindowHtml(url, websiteName, websiteId) {
   return `
     <!DOCTYPE html>
     <html>
@@ -233,6 +233,19 @@ function buildChildWindowHtml(url, websiteName) {
             display: flex;
             align-items: center;
             height: 100%;
+            overflow-x: auto;
+            scrollbar-width: thin;
+            min-width: 0;
+          }
+          .title-bar-tabs::-webkit-scrollbar {
+            height: 4px;
+          }
+          .title-bar-tabs::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .title-bar-tabs::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 2px;
           }
           .tab {
             height: 28px;
@@ -311,6 +324,7 @@ function buildChildWindowHtml(url, websiteName) {
             align-items: center;
             height: 100%;
             -webkit-app-region: no-drag;
+            flex-shrink: 0;
           }
           .window-control {
             width: 46px;
@@ -493,16 +507,19 @@ function buildChildWindowHtml(url, websiteName) {
             min-height: 32px;
             overflow: hidden;
           }
-          .url-display {
+          .url-input {
             flex: 1;
             padding: 6px 10px;
             font-size: 12px;
             color: rgba(0, 0, 0, 0.88);
             min-width: 0;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            text-align: left;
+            border: none;
+            outline: none;
+            background: transparent;
+            width: 100%;
+          }
+          .url-input:focus {
+            background: #fff;
           }
           .nav-buttons {
             display: flex;
@@ -587,8 +604,18 @@ function buildChildWindowHtml(url, websiteName) {
             </div>
             <div class="toolbar-section toolbar-section-2">
               <div class="url-container">
-                <div class="url-display" id="urlDisplay" title="${url}">${url}</div>
+                <input type="text" class="url-input" id="urlInput" value="${url}" spellcheck="false">
                 <div class="nav-buttons">
+                  <button class="nav-button" id="addBtn" title="新增">
+                    <svg viewBox="64 64 896 896" focusable="false" data-icon="plus" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M482 152h60q8 0 8 8v704q0 8-8 8h-60q-8 0-8-8V160q0-8 8-8z"></path><path d="M176 474h672q8 0 8 8v60q0 8-8 8H176q-8 0-8-8v-60q0-8 8-8z"></path></svg>
+                  </button>
+                  <button class="nav-button" id="reloadBtn" title="刷新">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="23 4 23 10 17 10"></polyline>
+                      <polyline points="1 20 1 14 7 14"></polyline>
+                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                  </button>
                   <button class="nav-button" id="backBtn" title="上一页">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <polyline points="15 18 9 12 15 6"></polyline>
@@ -610,7 +637,6 @@ function buildChildWindowHtml(url, websiteName) {
             </div>
             <div class="toolbar-section toolbar-section-3">
               <div class="tool-buttons">
-                <button class="ant-btn ant-btn-default" id="refreshBtn" title="刷新" style="font-size: 12px; padding: 2px 8px; height: 24px;">刷新</button>
                 <button class="ant-btn ant-btn-default" id="switchBtn" title="切换" style="font-size: 12px; padding: 2px 8px; height: 24px;">切换</button>
               </div>
             </div>
@@ -620,13 +646,15 @@ function buildChildWindowHtml(url, websiteName) {
           </div>
         </div>
         <script>
+          const websiteId = '${websiteId || ""}';
           const webview = document.getElementById('webview');
           const backBtn = document.getElementById('backBtn');
           const forwardBtn = document.getElementById('forwardBtn');
           const homeBtn = document.getElementById('homeBtn');
-          const refreshBtn = document.getElementById('refreshBtn');
+          const reloadBtn = document.getElementById('reloadBtn');
           const switchBtn = document.getElementById('switchBtn');
-          const urlDisplay = document.getElementById('urlDisplay');
+          const urlInput = document.getElementById('urlInput');
+          const addBtn = document.getElementById('addBtn');
           const minimizeBtn = document.getElementById('minimizeBtn');
           const maximizeBtn = document.getElementById('maximizeBtn');
           const closeBtn = document.getElementById('closeBtn');
@@ -767,8 +795,10 @@ function buildChildWindowHtml(url, websiteName) {
               // 延迟更新UI，确保WebView完全显示
               setTimeout(() => {
                 // 更新URL显示
-                urlDisplay.textContent = targetWebview.src;
-                urlDisplay.title = targetWebview.src;
+                if (urlInput) {
+                  urlInput.value = targetWebview.src;
+                  urlInput.title = targetWebview.src;
+                }
                 // 更新导航按钮状态
                 updateNavButtons();
               }, 100);
@@ -781,16 +811,20 @@ function buildChildWindowHtml(url, websiteName) {
           function setupWebviewListeners(wv) {
             wv.addEventListener('dom-ready', () => {
               if (wv === window.currentWebview) {
-                urlDisplay.textContent = wv.src;
-                urlDisplay.title = wv.src;
+                if (urlInput) {
+                  urlInput.value = wv.src;
+                  urlInput.title = wv.src;
+                }
                 updateNavButtons();
               }
             });
 
             wv.addEventListener('did-navigate', () => {
               if (wv === window.currentWebview) {
-                urlDisplay.textContent = wv.src;
-                urlDisplay.title = wv.src;
+                if (urlInput) {
+                  urlInput.value = wv.src;
+                  urlInput.title = wv.src;
+                }
                 updateNavButtons();
               }
             });
@@ -955,12 +989,64 @@ function buildChildWindowHtml(url, websiteName) {
             }
           });
 
-          refreshBtn.addEventListener('click', () => {
-            const currentWv = window.currentWebview;
-            if (currentWv) {
-              currentWv.reload();
-            }
-          });
+          if (reloadBtn) {
+            reloadBtn.addEventListener('click', () => {
+              const currentWv = window.currentWebview;
+              if (currentWv) {
+                currentWv.reload();
+              }
+            });
+          }
+          
+          if (addBtn) {
+            addBtn.addEventListener('click', () => {
+              if (window.ipcRenderer) {
+                // 即使 websiteId 为空，也发送消息，让主进程尝试通过 URL 查找
+                window.ipcRenderer.send('open-add-button-modal', websiteId);
+              }
+            });
+          }
+          
+          if (urlInput) {
+            urlInput.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter') {
+                const url = urlInput.value;
+                if (url) {
+                  let finalUrl = url;
+                  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                    finalUrl = 'http://' + url;
+                  }
+                  const currentWv = window.currentWebview;
+                  if (currentWv) {
+                    currentWv.src = finalUrl;
+                    urlInput.blur();
+                  }
+                }
+              } else if (e.key === 'Escape') {
+                const currentWv = window.currentWebview;
+                if (currentWv) {
+                  urlInput.value = currentWv.src;
+                  urlInput.blur();
+                }
+              }
+            });
+            
+            urlInput.addEventListener('focus', () => {
+              urlInput.select();
+            });
+            
+            urlInput.addEventListener('blur', () => {
+              const currentWv = window.currentWebview;
+              if (currentWv) {
+                // Delay slightly to allow click events on other buttons to process
+                setTimeout(() => {
+                   if (document.activeElement !== urlInput) {
+                     urlInput.value = currentWv.src;
+                   }
+                }, 200);
+              }
+            });
+          }
 
           switchBtn.addEventListener('click', () => {
             const currentWv = window.currentWebview;
@@ -1177,7 +1263,7 @@ async function createWindow() {
     win.loadFile(path$1.join(RENDERER_DIST, "index.html"));
   }
 }
-async function createChildWindow(url, windowId, windowMode = "maximized", websiteName, websiteIcon) {
+async function createChildWindow(url, windowId, windowMode = "maximized", websiteName, websiteIcon, _width = 1200, _height = 800, websiteId) {
   let mode;
   if (typeof windowMode === "boolean") {
     mode = windowMode ? "fullscreen" : "maximized";
@@ -1196,8 +1282,8 @@ async function createChildWindow(url, windowId, windowMode = "maximized", websit
     }
   }
   const childWin = new BrowserWindow({
-    width: 1e3,
-    height: 700,
+    width: 1200,
+    height: 800,
     show: false,
     // 先不显示，等设置好大小后再显示
     fullscreen: mode === "fullscreen",
@@ -1250,7 +1336,7 @@ async function createChildWindow(url, windowId, windowMode = "maximized", websit
       return { action: "allow" };
     });
   });
-  const htmlContent = buildChildWindowHtml(url, websiteName);
+  const htmlContent = buildChildWindowHtml(url, websiteName, websiteId);
   childWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(htmlContent));
   if (websiteName) {
     childWin.setTitle(websiteName);
@@ -1275,6 +1361,20 @@ async function createChildWindow(url, windowId, windowMode = "maximized", websit
     } else if (channel === "openNewWindow") {
       const [url2, name] = args;
       createChildWindow(url2, Date.now().toString(), "maximized", name);
+    } else if (channel === "openAddButtonModal") {
+      const passedWebsiteId = args[0];
+      let targetWebsiteId = passedWebsiteId;
+      if (!targetWebsiteId) {
+        const websiteData = storageService.getWebsites().find((w) => w.url === url);
+        if (websiteData) {
+          targetWebsiteId = websiteData.id;
+        }
+      }
+      if (targetWebsiteId && win) {
+        win.webContents.send("open-add-button-modal", targetWebsiteId);
+        win.show();
+        if (win.isMinimized()) win.restore();
+      }
     }
   });
   childWindows.set(windowId, childWin);
@@ -1313,9 +1413,9 @@ function setupIpcHandlers() {
   ipcMain.handle("delete-custom-button", (_event, websiteId, buttonId) => {
     return storageService.deleteCustomButton(websiteId, buttonId);
   });
-  ipcMain.handle("create-window", async (_event, url, windowMode = "maximized", websiteName, websiteIcon) => {
+  ipcMain.handle("create-window", async (_event, url, windowMode = "maximized", websiteName, websiteIcon, width, height, websiteId) => {
     const windowId = Date.now().toString();
-    await createChildWindow(url, windowId, windowMode, websiteName, websiteIcon);
+    await createChildWindow(url, windowId, windowMode, websiteName, websiteIcon, width, height, websiteId);
     return windowId;
   });
   ipcMain.handle("navigate-to-url", (_event, windowId, url) => {

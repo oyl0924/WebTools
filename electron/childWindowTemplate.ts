@@ -1,4 +1,4 @@
-export function buildChildWindowHtml(url: string, websiteName?: string): string {
+export function buildChildWindowHtml(url: string, websiteName?: string, websiteId?: string): string {
   return `
     <!DOCTYPE html>
     <html>
@@ -30,6 +30,19 @@ export function buildChildWindowHtml(url: string, websiteName?: string): string 
             display: flex;
             align-items: center;
             height: 100%;
+            overflow-x: auto;
+            scrollbar-width: thin;
+            min-width: 0;
+          }
+          .title-bar-tabs::-webkit-scrollbar {
+            height: 4px;
+          }
+          .title-bar-tabs::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .title-bar-tabs::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 2px;
           }
           .tab {
             height: 28px;
@@ -108,6 +121,7 @@ export function buildChildWindowHtml(url: string, websiteName?: string): string 
             align-items: center;
             height: 100%;
             -webkit-app-region: no-drag;
+            flex-shrink: 0;
           }
           .window-control {
             width: 46px;
@@ -290,16 +304,19 @@ export function buildChildWindowHtml(url: string, websiteName?: string): string 
             min-height: 32px;
             overflow: hidden;
           }
-          .url-display {
+          .url-input {
             flex: 1;
             padding: 6px 10px;
             font-size: 12px;
             color: rgba(0, 0, 0, 0.88);
             min-width: 0;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            text-align: left;
+            border: none;
+            outline: none;
+            background: transparent;
+            width: 100%;
+          }
+          .url-input:focus {
+            background: #fff;
           }
           .nav-buttons {
             display: flex;
@@ -384,8 +401,18 @@ export function buildChildWindowHtml(url: string, websiteName?: string): string 
             </div>
             <div class="toolbar-section toolbar-section-2">
               <div class="url-container">
-                <div class="url-display" id="urlDisplay" title="${url}">${url}</div>
+                <input type="text" class="url-input" id="urlInput" value="${url}" spellcheck="false">
                 <div class="nav-buttons">
+                  <button class="nav-button" id="addBtn" title="新增">
+                    <svg viewBox="64 64 896 896" focusable="false" data-icon="plus" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M482 152h60q8 0 8 8v704q0 8-8 8h-60q-8 0-8-8V160q0-8 8-8z"></path><path d="M176 474h672q8 0 8 8v60q0 8-8 8H176q-8 0-8-8v-60q0-8 8-8z"></path></svg>
+                  </button>
+                  <button class="nav-button" id="reloadBtn" title="刷新">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="23 4 23 10 17 10"></polyline>
+                      <polyline points="1 20 1 14 7 14"></polyline>
+                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                  </button>
                   <button class="nav-button" id="backBtn" title="上一页">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <polyline points="15 18 9 12 15 6"></polyline>
@@ -407,7 +434,6 @@ export function buildChildWindowHtml(url: string, websiteName?: string): string 
             </div>
             <div class="toolbar-section toolbar-section-3">
               <div class="tool-buttons">
-                <button class="ant-btn ant-btn-default" id="refreshBtn" title="刷新" style="font-size: 12px; padding: 2px 8px; height: 24px;">刷新</button>
                 <button class="ant-btn ant-btn-default" id="switchBtn" title="切换" style="font-size: 12px; padding: 2px 8px; height: 24px;">切换</button>
               </div>
             </div>
@@ -417,13 +443,15 @@ export function buildChildWindowHtml(url: string, websiteName?: string): string 
           </div>
         </div>
         <script>
+          const websiteId = '${websiteId || ''}';
           const webview = document.getElementById('webview');
           const backBtn = document.getElementById('backBtn');
           const forwardBtn = document.getElementById('forwardBtn');
           const homeBtn = document.getElementById('homeBtn');
-          const refreshBtn = document.getElementById('refreshBtn');
+          const reloadBtn = document.getElementById('reloadBtn');
           const switchBtn = document.getElementById('switchBtn');
-          const urlDisplay = document.getElementById('urlDisplay');
+          const urlInput = document.getElementById('urlInput');
+          const addBtn = document.getElementById('addBtn');
           const minimizeBtn = document.getElementById('minimizeBtn');
           const maximizeBtn = document.getElementById('maximizeBtn');
           const closeBtn = document.getElementById('closeBtn');
@@ -564,8 +592,10 @@ export function buildChildWindowHtml(url: string, websiteName?: string): string 
               // 延迟更新UI，确保WebView完全显示
               setTimeout(() => {
                 // 更新URL显示
-                urlDisplay.textContent = targetWebview.src;
-                urlDisplay.title = targetWebview.src;
+                if (urlInput) {
+                  urlInput.value = targetWebview.src;
+                  urlInput.title = targetWebview.src;
+                }
                 // 更新导航按钮状态
                 updateNavButtons();
               }, 100);
@@ -578,16 +608,20 @@ export function buildChildWindowHtml(url: string, websiteName?: string): string 
           function setupWebviewListeners(wv) {
             wv.addEventListener('dom-ready', () => {
               if (wv === window.currentWebview) {
-                urlDisplay.textContent = wv.src;
-                urlDisplay.title = wv.src;
+                if (urlInput) {
+                  urlInput.value = wv.src;
+                  urlInput.title = wv.src;
+                }
                 updateNavButtons();
               }
             });
 
             wv.addEventListener('did-navigate', () => {
               if (wv === window.currentWebview) {
-                urlDisplay.textContent = wv.src;
-                urlDisplay.title = wv.src;
+                if (urlInput) {
+                  urlInput.value = wv.src;
+                  urlInput.title = wv.src;
+                }
                 updateNavButtons();
               }
             });
@@ -752,12 +786,64 @@ export function buildChildWindowHtml(url: string, websiteName?: string): string 
             }
           });
 
-          refreshBtn.addEventListener('click', () => {
-            const currentWv = window.currentWebview;
-            if (currentWv) {
-              currentWv.reload();
-            }
-          });
+          if (reloadBtn) {
+            reloadBtn.addEventListener('click', () => {
+              const currentWv = window.currentWebview;
+              if (currentWv) {
+                currentWv.reload();
+              }
+            });
+          }
+          
+          if (addBtn) {
+            addBtn.addEventListener('click', () => {
+              if (window.ipcRenderer) {
+                // 即使 websiteId 为空，也发送消息，让主进程尝试通过 URL 查找
+                window.ipcRenderer.send('open-add-button-modal', websiteId);
+              }
+            });
+          }
+          
+          if (urlInput) {
+            urlInput.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter') {
+                const url = urlInput.value;
+                if (url) {
+                  let finalUrl = url;
+                  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                    finalUrl = 'http://' + url;
+                  }
+                  const currentWv = window.currentWebview;
+                  if (currentWv) {
+                    currentWv.src = finalUrl;
+                    urlInput.blur();
+                  }
+                }
+              } else if (e.key === 'Escape') {
+                const currentWv = window.currentWebview;
+                if (currentWv) {
+                  urlInput.value = currentWv.src;
+                  urlInput.blur();
+                }
+              }
+            });
+            
+            urlInput.addEventListener('focus', () => {
+              urlInput.select();
+            });
+            
+            urlInput.addEventListener('blur', () => {
+              const currentWv = window.currentWebview;
+              if (currentWv) {
+                // Delay slightly to allow click events on other buttons to process
+                setTimeout(() => {
+                   if (document.activeElement !== urlInput) {
+                     urlInput.value = currentWv.src;
+                   }
+                }, 200);
+              }
+            });
+          }
 
           switchBtn.addEventListener('click', () => {
             const currentWv = window.currentWebview;

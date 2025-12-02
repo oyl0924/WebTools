@@ -7,6 +7,7 @@ import AddWebsiteModal from './AddWebsiteModal.vue'
 import ManageModal from './ManageModal.vue'
 import SettingsModal from './SettingsModal.vue'
 import EditWebsiteModal from './EditWebsiteModal.vue'
+import CustomButtonModal from './CustomButtonModal.vue'
 
 const searchText = ref('')
 const websites = ref<Website[]>([])
@@ -14,6 +15,8 @@ const showAddModal = ref(false)
 const showManageModal = ref(false)
 const showSettingsModal = ref(false)
 const showEditModal = ref(false)
+const showCustomButtonModal = ref(false)
+const customButtonWebsite = ref<Website | null>(null)
 const searchInputRef = ref<HTMLInputElement>()
 const currentWebsite = ref<Website | null>(null)
 
@@ -147,23 +150,17 @@ const handleEditSuccess = async () => {
   await loadWebsites()
 }
 
-// 点击网站卡片
-const handleWebsiteClick = async (website: Website) => {
-  if (website.id === 'add') {
-    openAddModal()
-  } else {
-    // 创建新窗口打开网站，传递网站名称、窗口模式和图标
-    try {
-      // 兼容旧数据：如果没有 windowMode，根据 fullscreen 决定
-      const windowMode = website.windowMode || (website.fullscreen ? 'fullscreen' : 'maximized')
-      await window.ipcRenderer.invoke('create-window', website.url, windowMode, website.name, website.icon)
-    } catch (error) {
-      message.error('打开网站失败')
-      console.error(error)
-    }
-  }
+// 自定义按钮修改成功回调
+const handleCustomButtonSuccess = async () => {
+  showCustomButtonModal.value = false
+  customButtonWebsite.value = null
+  await loadWebsites()
 }
 
+// 点击网站卡片
+const handleWebsiteClick = (website: Website) => {
+  window.ipcRenderer.invoke('create-window', website.url, website.windowMode, website.name, website.icon, website.width, website.height, website.id)
+}
 
 // 添加成功回调
 const handleAddSuccess = async () => {
@@ -185,6 +182,15 @@ onMounted(() => {
 
   // 加载设置并应用黑暗模式
   loadSettingsAndApplyTheme()
+
+  // 监听打开自定义按钮弹窗事件
+  window.ipcRenderer.on('open-add-button-modal', (_event, websiteId) => {
+    const website = websites.value.find(w => w.id === websiteId)
+    if (website) {
+      customButtonWebsite.value = website
+      showCustomButtonModal.value = true
+    }
+  })
 })
 
 // 加载设置并应用主题
@@ -284,6 +290,14 @@ const loadSettingsAndApplyTheme = async () => {
       :website="currentWebsite"
       @success="handleEditSuccess"
     />
+
+    <!-- 自定义按钮弹窗 -->
+    <CustomButtonModal
+      v-if="customButtonWebsite"
+      v-model:open="showCustomButtonModal"
+      :website="customButtonWebsite"
+      @success="handleCustomButtonSuccess"
+    />
   </div>
 </template>
 
@@ -379,3 +393,7 @@ const loadSettingsAndApplyTheme = async () => {
   margin-top: 8px;
 }
 </style>
+
+
+
+

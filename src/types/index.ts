@@ -5,6 +5,8 @@ export interface Website {
   url: string
   icon?: string
   windowMode?: 'normal' | 'maximized' | 'fullscreen' // 窗口模式：正常、最大化、全屏
+  width?: number // 窗口宽度
+  height?: number // 窗口高度
   fullscreen?: boolean // 保留兼容性
   customButtons: CustomButton[]
 }
@@ -41,3 +43,4 @@ export const IPC_CHANNELS = {
   CREATE_WINDOW: 'create-window',
   NAVIGATE_TO_URL: 'navigate-to-url'
 }
+

@@ -200,7 +200,7 @@ async function createWindow() {
 }
 
 // 创建子窗口
-async function createChildWindow(url: string, windowId: string, windowMode: 'normal' | 'maximized' | 'fullscreen' | boolean = 'maximized', websiteName?: string, websiteIcon?: string) {
+async function createChildWindow(url: string, windowId: string, windowMode: 'normal' | 'maximized' | 'fullscreen' | boolean = 'maximized', websiteName?: string, websiteIcon?: string, _width: number = 1200, _height: number = 800, websiteId?: string) {
   // 兼容旧的 boolean 类型（fullscreen 参数）
   let mode: 'normal' | 'maximized' | 'fullscreen'
   if (typeof windowMode === 'boolean') {
@@ -225,8 +225,8 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
   }
 
   const childWin = new BrowserWindow({
-    width: 1000,
-    height: 700,
+    width: 1200,
+    height: 800,
     show: false, // 先不显示，等设置好大小后再显示
     fullscreen: mode === 'fullscreen',
     frame: false, // 无边框窗口
@@ -296,7 +296,7 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
   })
 
   // 加载包含功能栏的HTML页面
-  const htmlContent = buildChildWindowHtml(url, websiteName)
+  const htmlContent = buildChildWindowHtml(url, websiteName, websiteId)
 
   childWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent))
 
@@ -328,6 +328,24 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
     } else if (channel === 'openNewWindow') {
       const [url, name] = args
       createChildWindow(url, Date.now().toString(), 'maximized', name)
+    } else if (channel === 'openAddButtonModal') {
+      // args[0] 可能是 websiteId，如果前端传递了的话
+      const passedWebsiteId = args[0]
+      let targetWebsiteId = passedWebsiteId
+
+      if (!targetWebsiteId) {
+        // 降级：通过 URL 查找
+        const websiteData = storageService.getWebsites().find(w => w.url === url)
+        if (websiteData) {
+          targetWebsiteId = websiteData.id
+        }
+      }
+
+      if (targetWebsiteId && win) {
+        win.webContents.send('open-add-button-modal', targetWebsiteId)
+        win.show() // 确保主窗口显示
+        if (win.isMinimized()) win.restore()
+      }
     }
   })
 
@@ -390,9 +408,9 @@ function setupIpcHandlers() {
   })
 
   // 创建新窗口
-  ipcMain.handle('create-window', async (_event, url, windowMode: 'normal' | 'maximized' | 'fullscreen' | boolean = 'maximized', websiteName?: string, websiteIcon?: string) => {
+  ipcMain.handle('create-window', async (_event, url, windowMode: 'normal' | 'maximized' | 'fullscreen' | boolean = 'maximized', websiteName?: string, websiteIcon?: string, width?: number, height?: number, websiteId?: string) => {
     const windowId = Date.now().toString()
-    await createChildWindow(url, windowId, windowMode, websiteName, websiteIcon)
+    await createChildWindow(url, windowId, windowMode, websiteName, websiteIcon, width, height, websiteId)
     return windowId
   })
 
