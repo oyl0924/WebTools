@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { DesktopOutlined } from '@ant-design/icons-vue'
+import { DesktopOutlined, SettingOutlined } from '@ant-design/icons-vue'
 import type { Website } from '../types'
+import CustomButtonModal from './CustomButtonModal.vue'
 
 interface Props {
   open: boolean
@@ -18,6 +19,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const formRef = ref()
+const showCustomButtonModal = ref(false)
 const formState = reactive({
   name: '',
   url: '',
@@ -110,6 +112,11 @@ const addToDesktop = async () => {
     console.error(error)
   }
 }
+
+// 打开自定义按钮管理
+const openCustomButtonModal = () => {
+  showCustomButtonModal.value = true
+}
 </script>
 
 <template>
@@ -126,6 +133,12 @@ const addToDesktop = async () => {
           <DesktopOutlined />
         </template>
         添加到桌面
+      </a-button>
+      <a-button @click="openCustomButtonModal">
+        <template #icon>
+          <SettingOutlined />
+        </template>
+        自定义按钮
       </a-button>
       <a-button @click="handleClose">取消</a-button>
       <a-button type="primary" @click="handleSubmit">确定</a-button>
@@ -188,6 +201,14 @@ const addToDesktop = async () => {
       </a-form-item>
     </a-form>
   </a-modal>
+
+  <!-- 自定义按钮管理弹窗 -->
+  <CustomButtonModal
+    v-if="props.website"
+    v-model:open="showCustomButtonModal"
+    :website="props.website"
+    @success="handleClose"
+  />
 </template>
 
 <style scoped>

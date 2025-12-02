@@ -1,0 +1,74 @@
+/* 自定义标题栏样式 */
+.title-bar {
+  height: 32px;
+  background: #ffffff;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  -webkit-app-region: drag;
+  user-select: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+}
+.title-bar-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 12px;
+}
+.app-title {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+.window-controls {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+.window-control {
+  width: 46px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.window-control:hover {
+  background: #e5e5e5;
+}
+.window-control:active {
+  background: #cccccc;
+}
+.window-control.close:hover {
+  background: #e81123;
+}
+.window-control.close:hover svg {
+  stroke: white;
+}
+.window-control svg {
+  width: 12px;
+  height: 12px;
+  stroke: #333;
+  fill: none;
+  stroke-width: 1.5;
+}
+/* 主内容区域调整 */
+#app {
+  height: calc(100vh - 32px);
+  overflow: auto;
+}
+body {
+  margin: 0;
+  padding: 0;
+}

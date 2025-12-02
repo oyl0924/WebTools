@@ -6,9 +6,66 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data:;">
     <title>WebTools</title>
+    <link rel="stylesheet" href="/title-bar.css">
   </head>
   <body>
+    <!-- 自定义标题栏 -->
+    <div class="title-bar">
+      <div class="title-bar-content">
+        <span class="app-title">WebTools</span>
+      </div>
+      <div class="window-controls">
+        <button class="window-control minimize" id="minimizeBtn" title="最小化">
+          <svg viewBox="0 0 12 12">
+            <line x1="1" y1="6" x2="11" y2="6" stroke="currentColor" stroke-width="1"/>
+          </svg>
+        </button>
+        <button class="window-control maximize" id="maximizeBtn" title="最大化">
+          <svg viewBox="0 0 12 12">
+            <rect x="1" y="1" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1"/>
+          </svg>
+        </button>
+        <button class="window-control close" id="closeBtn" title="关闭">
+          <svg viewBox="0 0 12 12">
+            <line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+        </button>
+      </div>
+    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
+    <script>
+      // 窗口控制功能
+      const minimizeBtn = document.getElementById('minimizeBtn');
+      const maximizeBtn = document.getElementById('maximizeBtn');
+      const closeBtn = document.getElementById('closeBtn');
+
+      minimizeBtn.addEventListener('click', () => {
+        window.ipcRenderer.send('window-control', 'minimize');
+      });
+
+      maximizeBtn.addEventListener('click', () => {
+        window.ipcRenderer.send('window-control', 'maximize');
+      });
+
+      closeBtn.addEventListener('click', () => {
+        window.ipcRenderer.send('window-control', 'close');
+      });
+
+      // 监听窗口状态变化，更新最大化按钮图标
+      window.ipcRenderer.on('window-state-changed', (event, isMaximized) => {
+        const maximizeIcon = maximizeBtn.querySelector('svg');
+        if (isMaximized) {
+          // VS Code风格的还原图标 - 两个重叠的方框
+          maximizeIcon.innerHTML = '<rect x="2" y="2" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1"/><rect x="4" y="4" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1"/>';
+          maximizeBtn.title = '向下还原';
+        } else {
+          // 最大化图标 - 保持简洁的方框
+          maximizeIcon.innerHTML = '<rect x="1" y="1" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1"/>';
+          maximizeBtn.title = '最大化';
+        }
+      });
+    </script>
   </body>
 </html>

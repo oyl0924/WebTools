@@ -297,8 +297,8 @@ const loadSettingsAndApplyTheme = async () => {
 
 .header-buttons {
   position: absolute;
-  top: 20px;
-  right: 40px;
+  top: 50px;
+  right: 30px;
   z-index: 10;
   display: flex;
   gap: 12px;
@@ -307,6 +307,7 @@ const loadSettingsAndApplyTheme = async () => {
 .search-bar {
   display: flex;
   justify-content: center;
+  margin-top: 30px;
   margin-bottom: 40px;
 }
 
