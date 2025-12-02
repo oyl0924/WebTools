@@ -240,6 +240,26 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
     }
   })
 
+  // 拦截 webview 内部的 window.open / target="_blank"，在当前窗口中以新标签页打开
+  childWin.webContents.on('did-attach-webview', (_event, webContents) => {
+    if (!webContents || !webContents.setWindowOpenHandler) return
+
+    webContents.setWindowOpenHandler((details) => {
+      try {
+        const url = details.url
+        if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+          childWin.webContents.send('webview-new-window', url)
+          return { action: 'deny' }
+        }
+      } catch (error) {
+        console.error('Error in webview windowOpen handler:', error)
+      }
+
+      // 对于非 http/https 链接，保持默认行为
+      return { action: 'allow' }
+    })
+  })
+
   // 加载包含功能栏的HTML页面
   const htmlContent = `
     <!DOCTYPE html>
@@ -835,35 +855,9 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
             });
 
             // 处理新窗口打开请求（target="_blank"）
-            wv.addEventListener('new-window', (event) => {
-              event.preventDefault();
-              console.log('new-window event intercepted:', event.url);
-              try {
-                const newUrl = event.url;
-                if (newUrl && (newUrl.startsWith('http') || newUrl.startsWith('https'))) {
-                  // 尝试从URL获取页面标题，或者使用当前页面标题
-                  let pageTitle = wv.getTitle() || '新标签页';
-                  // 如果是同域名下的链接，尝试从URL路径提取更友好的标题
-                  try {
-                    const urlObj = new URL(newUrl);
-                    const pathSegments = urlObj.pathname.split('/').filter(segment => segment);
-                    if (pathSegments.length > 0) {
-                      pageTitle = pathSegments[pathSegments.length - 1] || pageTitle;
-                      // 简单的标题格式化
-                      pageTitle = pageTitle.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                    }
-                  } catch (e) {
-                    // URL解析失败，使用默认标题
-                  }
-                  console.log('Creating new tab with URL:', newUrl, 'Title:', pageTitle);
-                  createNewTab(newUrl, pageTitle);
-                } else {
-                  console.warn('Invalid URL for new window:', newUrl);
-                }
-              } catch (error) {
-                console.error('Error handling new-window event:', error);
-              }
-            });
+            // 注意：具体拦截逻辑已移动到主进程的 webContents.setWindowOpenHandler，
+            // 然后通过 'webview-new-window' 事件通知当前窗口在标签页中打开。
+            // 这里不再直接使用 webview 的 new-window 事件，以避免在不同 Electron 版本下行为不一致。
 
             // 处理页面标题更新
             wv.addEventListener('page-title-updated', (event) => {
@@ -970,6 +964,17 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
                 // 最大化图标 - 保持简洁的方框
                 maximizeIcon.innerHTML = '<rect x="1" y="1" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1"/>';
                 maximizeBtn.title = '最大化';
+              }
+            });
+
+            // 从主进程接收 webview 新窗口请求，在当前子窗口中打开新标签页
+            window.ipcRenderer.on('webview-new-window', (_event, url) => {
+              try {
+                if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+                  createNewTab(url, '新标签页');
+                }
+              } catch (error) {
+                console.error('Error handling webview-new-window IPC:', error);
               }
             });
           }
