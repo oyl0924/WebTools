@@ -1,272 +1,390 @@
-var R = Object.defineProperty;
-var P = (s, t, e) => t in s ? R(s, t, { enumerable: !0, configurable: !0, writable: !0, value: e }) : s[t] = e;
-var k = (s, t, e) => P(s, typeof t != "symbol" ? t + "" : t, e);
-import { app as g, BrowserWindow as h, ipcMain as c, shell as M } from "electron";
-import { fileURLToPath as j } from "node:url";
-import p from "node:path";
-import f from "node:fs";
-import $ from "node:https";
-import _ from "node:http";
-import v from "fs";
-import W from "path";
-const U = "websites.json";
-class A {
+var __defProp = Object.defineProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { fileURLToPath } from "node:url";
+import path$1 from "node:path";
+import fs$1 from "node:fs";
+import https from "node:https";
+import http from "node:http";
+import fs from "fs";
+import path from "path";
+const STORAGE_FILE = "websites.json";
+class StorageService {
   constructor() {
-    k(this, "storagePath");
-    this.storagePath = W.join(g.getPath("userData"), U), this.initStorage();
+    __publicField(this, "storagePath");
+    this.storagePath = path.join(app.getPath("userData"), STORAGE_FILE);
+    this.initStorage();
   }
   initStorage() {
-    v.existsSync(this.storagePath) || this.saveData([]);
+    if (!fs.existsSync(this.storagePath)) {
+      this.saveData([]);
+    }
   }
   loadData() {
     try {
-      const t = v.readFileSync(this.storagePath, "utf-8");
-      return JSON.parse(t);
-    } catch (t) {
-      return console.error("Error loading data:", t), [];
+      const data = fs.readFileSync(this.storagePath, "utf-8");
+      return JSON.parse(data);
+    } catch (error) {
+      console.error("Error loading data:", error);
+      return [];
     }
   }
-  saveData(t) {
+  saveData(websites) {
     try {
-      v.writeFileSync(this.storagePath, JSON.stringify(t, null, 2), "utf-8");
-    } catch (e) {
-      console.error("Error saving data:", e);
+      fs.writeFileSync(this.storagePath, JSON.stringify(websites, null, 2), "utf-8");
+    } catch (error) {
+      console.error("Error saving data:", error);
     }
   }
   getWebsites() {
     return this.loadData();
   }
-  addWebsite(t) {
-    const e = this.loadData(), o = {
-      ...t,
+  addWebsite(website) {
+    const websites = this.loadData();
+    const newWebsite = {
+      ...website,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      customButtons: t.customButtons || []
+      customButtons: website.customButtons || []
     };
-    return e.push(o), this.saveData(e), o;
+    websites.push(newWebsite);
+    this.saveData(websites);
+    return newWebsite;
   }
-  updateWebsite(t, e) {
-    const o = this.loadData(), i = o.findIndex((n) => n.id === t);
-    return i === -1 ? null : (o[i] = { ...o[i], ...e }, this.saveData(o), o[i]);
+  updateWebsite(id, updates) {
+    const websites = this.loadData();
+    const index = websites.findIndex((w) => w.id === id);
+    if (index === -1) return null;
+    websites[index] = { ...websites[index], ...updates };
+    this.saveData(websites);
+    return websites[index];
   }
-  deleteWebsite(t) {
-    const e = this.loadData(), o = e.findIndex((i) => i.id === t);
-    return o === -1 ? !1 : (e.splice(o, 1), this.saveData(e), !0);
+  deleteWebsite(id) {
+    const websites = this.loadData();
+    const index = websites.findIndex((w) => w.id === id);
+    if (index === -1) return false;
+    websites.splice(index, 1);
+    this.saveData(websites);
+    return true;
   }
-  addCustomButton(t, e) {
-    const o = this.loadData(), i = o.find((a) => a.id === t);
-    if (!i) return null;
-    const n = {
-      ...e,
+  addCustomButton(websiteId, button) {
+    const websites = this.loadData();
+    const website = websites.find((w) => w.id === websiteId);
+    if (!website) return null;
+    const newButton = {
+      ...button,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9)
     };
-    return i.customButtons.push(n), this.saveData(o), n;
+    website.customButtons.push(newButton);
+    this.saveData(websites);
+    return newButton;
   }
-  updateCustomButton(t, e, o) {
-    const i = this.loadData(), n = i.find((r) => r.id === t);
-    if (!n) return null;
-    const a = n.customButtons.findIndex((r) => r.id === e);
-    return a === -1 ? null : (n.customButtons[a] = { ...n.customButtons[a], ...o }, this.saveData(i), n.customButtons[a]);
+  updateCustomButton(websiteId, buttonId, updates) {
+    const websites = this.loadData();
+    const website = websites.find((w) => w.id === websiteId);
+    if (!website) return null;
+    const buttonIndex = website.customButtons.findIndex((b) => b.id === buttonId);
+    if (buttonIndex === -1) return null;
+    website.customButtons[buttonIndex] = { ...website.customButtons[buttonIndex], ...updates };
+    this.saveData(websites);
+    return website.customButtons[buttonIndex];
   }
-  deleteCustomButton(t, e) {
-    const o = this.loadData(), i = o.find((a) => a.id === t);
-    if (!i) return !1;
-    const n = i.customButtons.findIndex((a) => a.id === e);
-    return n === -1 ? !1 : (i.customButtons.splice(n, 1), this.saveData(o), !0);
+  deleteCustomButton(websiteId, buttonId) {
+    const websites = this.loadData();
+    const website = websites.find((w) => w.id === websiteId);
+    if (!website) return false;
+    const buttonIndex = website.customButtons.findIndex((b) => b.id === buttonId);
+    if (buttonIndex === -1) return false;
+    website.customButtons.splice(buttonIndex, 1);
+    this.saveData(websites);
+    return true;
   }
 }
-const w = new A(), D = {
+const storageService = new StorageService();
+const DEFAULT_SETTINGS = {
   darkMode: "manual",
   darkModeTimeStart: "18:00",
   darkModeTimeEnd: "06:00",
-  isDarkMode: !1,
+  isDarkMode: false,
   homeWindowSize: "maximized",
-  autoStart: !1,
+  autoStart: false,
   backgroundType: "default",
   backgroundColor: "#f0f2f5",
   backgroundImage: ""
 };
-class O {
+class SettingsService {
   constructor() {
-    k(this, "settingsPath");
-    k(this, "settings");
-    this.settingsPath = W.join(g.getPath("userData"), "settings.json"), this.settings = this.loadSettings();
+    __publicField(this, "settingsPath");
+    __publicField(this, "settings");
+    this.settingsPath = path.join(app.getPath("userData"), "settings.json");
+    this.settings = this.loadSettings();
   }
   loadSettings() {
     try {
-      if (v.existsSync(this.settingsPath)) {
-        const t = v.readFileSync(this.settingsPath, "utf-8"), e = JSON.parse(t);
-        return { ...D, ...e };
+      if (fs.existsSync(this.settingsPath)) {
+        const data = fs.readFileSync(this.settingsPath, "utf-8");
+        const parsed = JSON.parse(data);
+        return { ...DEFAULT_SETTINGS, ...parsed };
       }
-    } catch (t) {
-      console.error("加载设置失败:", t);
+    } catch (error) {
+      console.error("加载设置失败:", error);
     }
-    return { ...D };
+    return { ...DEFAULT_SETTINGS };
   }
   saveSettings() {
     try {
-      const t = JSON.stringify(this.settings, null, 2);
-      v.writeFileSync(this.settingsPath, t, "utf-8");
-    } catch (t) {
-      console.error("保存设置失败:", t);
+      const data = JSON.stringify(this.settings, null, 2);
+      fs.writeFileSync(this.settingsPath, data, "utf-8");
+    } catch (error) {
+      console.error("保存设置失败:", error);
     }
   }
   getSettings() {
     return { ...this.settings };
   }
-  updateSettings(t) {
-    return this.settings = { ...this.settings, ...t }, this.saveSettings(), this.settings;
+  updateSettings(newSettings) {
+    this.settings = { ...this.settings, ...newSettings };
+    this.saveSettings();
+    return this.settings;
   }
   // 检测是否应该使用黑暗模式
   shouldUseDarkMode() {
-    const { darkMode: t, darkModeTimeStart: e, darkModeTimeEnd: o, isDarkMode: i } = this.settings;
-    if (t === "manual")
-      return i;
-    if (t === "system")
-      return !1;
-    if (t === "time") {
-      const n = /* @__PURE__ */ new Date(), a = n.getHours() * 60 + n.getMinutes(), [r, u] = e.split(":").map(Number), [d, b] = o.split(":").map(Number), y = r * 60 + u, m = d * 60 + b;
-      return y <= m ? a >= y && a <= m : a >= y || a <= m;
+    const { darkMode, darkModeTimeStart, darkModeTimeEnd, isDarkMode } = this.settings;
+    if (darkMode === "manual") {
+      return isDarkMode;
+    } else if (darkMode === "system") {
+      return false;
+    } else if (darkMode === "time") {
+      const now = /* @__PURE__ */ new Date();
+      const currentTime = now.getHours() * 60 + now.getMinutes();
+      const [startHour, startMin] = darkModeTimeStart.split(":").map(Number);
+      const [endHour, endMin] = darkModeTimeEnd.split(":").map(Number);
+      const startTime = startHour * 60 + startMin;
+      const endTime = endHour * 60 + endMin;
+      if (startTime <= endTime) {
+        return currentTime >= startTime && currentTime <= endTime;
+      } else {
+        return currentTime >= startTime || currentTime <= endTime;
+      }
     }
-    return !1;
+    return false;
   }
   // 设置开机启动
-  async setAutoStart(t) {
+  async setAutoStart(enabled) {
     try {
-      const { app: e } = await import("electron");
-      e.setLoginItemSettings({
-        openAtLogin: t,
-        openAsHidden: !1,
-        path: e.getPath("exe"),
-        args: t ? [] : ["--disable-auto-start"]
-      }), this.updateSettings({ autoStart: t }), console.log(`开机启动设置已${t ? "启用" : "禁用"}`);
-    } catch (e) {
-      throw console.error("设置开机启动失败:", e), e;
+      const { app: app2 } = await import("electron");
+      app2.setLoginItemSettings({
+        openAtLogin: enabled,
+        openAsHidden: false,
+        path: app2.getPath("exe"),
+        args: enabled ? [] : ["--disable-auto-start"]
+      });
+      this.updateSettings({ autoStart: enabled });
+      console.log(`开机启动设置已${enabled ? "启用" : "禁用"}`);
+    } catch (error) {
+      console.error("设置开机启动失败:", error);
+      throw error;
     }
   }
   // 获取开机启动状态
   getAutoStartStatus() {
     try {
-      const { app: t } = require("electron"), e = t.getLoginItemSettings(), o = e.openAtLogin || (e.executableWillLaunchAtLogin ?? !1) || e.launchItems && e.launchItems.length > 0;
-      return console.log(`获取开机启动状态: ${o ? "启用" : "禁用"}`, e), o;
-    } catch (t) {
-      return console.error("获取开机启动状态失败:", t), !1;
+      const { app: app2 } = require("electron");
+      const loginSettings = app2.getLoginItemSettings();
+      const isEnabled = loginSettings.openAtLogin || (loginSettings.executableWillLaunchAtLogin ?? false) || loginSettings.launchItems && loginSettings.launchItems.length > 0;
+      console.log(`获取开机启动状态: ${isEnabled ? "启用" : "禁用"}`, loginSettings);
+      return isEnabled;
+    } catch (error) {
+      console.error("获取开机启动状态失败:", error);
+      return false;
     }
   }
 }
-const B = new O(), x = p.dirname(j(import.meta.url));
-process.env.APP_ROOT = p.join(x, "..");
-const I = process.env.VITE_DEV_SERVER_URL, Z = p.join(process.env.APP_ROOT, "dist-electron"), z = p.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = I ? p.join(process.env.APP_ROOT, "public") : z;
-let l;
-const T = /* @__PURE__ */ new Map();
-function N() {
-  const s = p.join(g.getPath("userData"), "icons");
-  return f.existsSync(s) || f.mkdirSync(s, { recursive: !0 }), s;
+const settingsService = new SettingsService();
+const __dirname$1 = path$1.dirname(fileURLToPath(import.meta.url));
+process.env.APP_ROOT = path$1.join(__dirname$1, "..");
+const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
+const MAIN_DIST = path$1.join(process.env.APP_ROOT, "dist-electron");
+const RENDERER_DIST = path$1.join(process.env.APP_ROOT, "dist");
+process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path$1.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
+let win;
+const childWindows = /* @__PURE__ */ new Map();
+function getIconsDir() {
+  const iconsDir = path$1.join(app.getPath("userData"), "icons");
+  if (!fs$1.existsSync(iconsDir)) {
+    fs$1.mkdirSync(iconsDir, { recursive: true });
+  }
+  return iconsDir;
 }
-async function S(s, t) {
-  return new Promise((e) => {
+async function downloadIcon(iconUrl, websiteId) {
+  return new Promise((resolve) => {
     try {
-      const o = N(), i = p.extname(new URL(s).pathname) || ".ico", n = p.join(o, `${t}${i}`);
-      if (f.existsSync(n)) {
-        e(n);
+      const iconsDir = getIconsDir();
+      const ext = path$1.extname(new URL(iconUrl).pathname) || ".ico";
+      const iconPath = path$1.join(iconsDir, `${websiteId}${ext}`);
+      if (fs$1.existsSync(iconPath)) {
+        resolve(iconPath);
         return;
       }
-      const a = f.createWriteStream(n), u = (s.startsWith("https") ? $ : _).get(s, { timeout: 3e3 }, (d) => {
-        if (d.statusCode === 301 || d.statusCode === 302) {
-          const b = d.headers.location;
-          if (b) {
-            a.close(), f.unlinkSync(n), S(b, t).then(e);
+      const file = fs$1.createWriteStream(iconPath);
+      const protocol = iconUrl.startsWith("https") ? https : http;
+      const request = protocol.get(iconUrl, { timeout: 3e3 }, (response) => {
+        if (response.statusCode === 301 || response.statusCode === 302) {
+          const redirectUrl = response.headers.location;
+          if (redirectUrl) {
+            file.close();
+            fs$1.unlinkSync(iconPath);
+            downloadIcon(redirectUrl, websiteId).then(resolve);
             return;
           }
         }
-        if (d.statusCode !== 200) {
-          a.close(), f.unlinkSync(n), e(null);
+        if (response.statusCode !== 200) {
+          file.close();
+          fs$1.unlinkSync(iconPath);
+          resolve(null);
           return;
         }
-        d.pipe(a), a.on("finish", () => {
-          a.close(), e(n);
+        response.pipe(file);
+        file.on("finish", () => {
+          file.close();
+          resolve(iconPath);
         });
       });
-      u.on("error", () => {
-        a.close(), f.existsSync(n) && f.unlinkSync(n), e(null);
-      }), u.on("timeout", () => {
-        u.destroy(), a.close(), f.existsSync(n) && f.unlinkSync(n), e(null);
+      request.on("error", () => {
+        file.close();
+        if (fs$1.existsSync(iconPath)) {
+          fs$1.unlinkSync(iconPath);
+        }
+        resolve(null);
       });
-    } catch (o) {
-      console.error("下载图标失败:", o), e(null);
+      request.on("timeout", () => {
+        request.destroy();
+        file.close();
+        if (fs$1.existsSync(iconPath)) {
+          fs$1.unlinkSync(iconPath);
+        }
+        resolve(null);
+      });
+    } catch (error) {
+      console.error("下载图标失败:", error);
+      resolve(null);
     }
   });
 }
-async function L() {
-  const s = B.getSettings();
-  l = new h({
+async function createWindow() {
+  const savedSettings = settingsService.getSettings();
+  win = new BrowserWindow({
     width: 1200,
     height: 800,
-    icon: p.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
-    frame: !1,
+    icon: path$1.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+    frame: false,
     // 无边框窗口
     titleBarStyle: "hidden",
     // 隐藏系统标题栏
-    autoHideMenuBar: !0,
-    show: !1,
+    autoHideMenuBar: true,
+    show: false,
     // 先不显示，等设置好大小后再显示
     webPreferences: {
-      preload: p.join(x, "preload.mjs"),
-      webviewTag: !0,
-      contextIsolation: !0,
-      nodeIntegration: !1
+      preload: path$1.join(__dirname$1, "preload.mjs"),
+      webviewTag: true,
+      contextIsolation: true,
+      nodeIntegration: false
     }
-  }), s.homeWindowSize === "maximized" ? l.maximize() : s.homeWindowSize === "fullscreen" && l.setFullScreen(!0), l.show(), l.webContents.on("before-input-event", (t, e) => {
-    if (e.key === "Alt") {
-      t.preventDefault();
+  });
+  if (savedSettings.homeWindowSize === "maximized") {
+    win.maximize();
+  } else if (savedSettings.homeWindowSize === "fullscreen") {
+    win.setFullScreen(true);
+  }
+  win.show();
+  win.webContents.on("before-input-event", (event, input) => {
+    if (input.key === "Alt") {
+      event.preventDefault();
       return;
     }
-    e.key === "F12" ? (l != null && l.webContents.isDevToolsOpened() ? l.webContents.closeDevTools() : l == null || l.webContents.openDevTools(), t.preventDefault()) : e.key === "F5" && (l == null || l.webContents.reload(), t.preventDefault());
-  }), l.webContents.on("did-finish-load", () => {
-    l == null || l.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
-  }), I ? l.loadURL(I) : l.loadFile(p.join(z, "index.html"));
+    if (input.key === "F12") {
+      if (win == null ? void 0 : win.webContents.isDevToolsOpened()) {
+        win.webContents.closeDevTools();
+      } else {
+        win == null ? void 0 : win.webContents.openDevTools();
+      }
+      event.preventDefault();
+    } else if (input.key === "F5") {
+      win == null ? void 0 : win.webContents.reload();
+      event.preventDefault();
+    }
+  });
+  win.webContents.on("did-finish-load", () => {
+    win == null ? void 0 : win.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
+  });
+  if (VITE_DEV_SERVER_URL) {
+    win.loadURL(VITE_DEV_SERVER_URL);
+  } else {
+    win.loadFile(path$1.join(RENDERER_DIST, "index.html"));
+  }
 }
-async function C(s, t, e = "maximized", o, i) {
-  let n;
-  typeof e == "boolean" ? n = e ? "fullscreen" : "maximized" : n = e;
-  let a = p.join(process.env.VITE_PUBLIC || x, "electron-vite.svg");
-  if (i)
+async function createChildWindow(url, windowId, windowMode = "maximized", websiteName, websiteIcon) {
+  let mode;
+  if (typeof windowMode === "boolean") {
+    mode = windowMode ? "fullscreen" : "maximized";
+  } else {
+    mode = windowMode;
+  }
+  let windowIcon = path$1.join(process.env.VITE_PUBLIC || __dirname$1, "electron-vite.svg");
+  if (websiteIcon) {
     try {
-      const d = await S(i, `window_${t}`);
-      d && f.existsSync(d) && (a = d);
-    } catch {
+      const iconPath = await downloadIcon(websiteIcon, `window_${windowId}`);
+      if (iconPath && fs$1.existsSync(iconPath)) {
+        windowIcon = iconPath;
+      }
+    } catch (error) {
       console.log("下载网站图标失败，使用默认图标");
     }
-  const r = new h({
+  }
+  const childWin = new BrowserWindow({
     width: 1e3,
     height: 700,
-    show: !1,
+    show: false,
     // 先不显示，等设置好大小后再显示
-    fullscreen: n === "fullscreen",
-    frame: !1,
+    fullscreen: mode === "fullscreen",
+    frame: false,
     // 无边框窗口
     titleBarStyle: "hidden",
     // 隐藏系统标题栏
-    autoHideMenuBar: !0,
-    icon: a,
+    autoHideMenuBar: true,
+    icon: windowIcon,
     webPreferences: {
-      preload: p.join(x, "preload.mjs"),
-      webviewTag: !0,
-      contextIsolation: !0,
-      nodeIntegration: !1
+      preload: path$1.join(__dirname$1, "preload.mjs"),
+      webviewTag: true,
+      contextIsolation: true,
+      nodeIntegration: false
     }
   });
-  n === "maximized" && r.maximize(), r.once("ready-to-show", () => {
-    r.show();
-  }), r.webContents.on("before-input-event", (d, b) => {
-    b.key === "F12" ? (r.webContents.isDevToolsOpened() ? r.webContents.closeDevTools() : r.webContents.openDevTools(), d.preventDefault()) : b.key === "F5" && (r.webContents.reload(), d.preventDefault());
+  if (mode === "maximized") {
+    childWin.maximize();
+  }
+  childWin.once("ready-to-show", () => {
+    childWin.show();
   });
-  const u = `
+  childWin.webContents.on("before-input-event", (event, input) => {
+    if (input.key === "F12") {
+      if (childWin.webContents.isDevToolsOpened()) {
+        childWin.webContents.closeDevTools();
+      } else {
+        childWin.webContents.openDevTools();
+      }
+      event.preventDefault();
+    } else if (input.key === "F5") {
+      childWin.webContents.reload();
+      event.preventDefault();
+    }
+  });
+  const htmlContent = `
     <!DOCTYPE html>
     <html>
       <head>
         <meta charset="UTF-8">
-        <title>${o || "WebTools"}</title>
+        <title>${websiteName || "WebTools"}</title>
         <style>
           body {
             margin: 0;
@@ -604,7 +722,7 @@ async function C(s, t, e = "maximized", o, i) {
           <div class="title-bar">
             <div class="title-bar-tabs">
               <div class="tab active" id="currentTab">
-                <span class="tab-title">${o || "新标签页"}</span>
+                <span class="tab-title">${websiteName || "新标签页"}</span>
                 <span class="tab-close" id="closeTab">×</span>
               </div>
               <button class="new-tab-btn" id="newTabBtn" title="新标签页">+</button>
@@ -637,7 +755,7 @@ async function C(s, t, e = "maximized", o, i) {
             </div>
             <div class="toolbar-section toolbar-section-2">
               <div class="url-container">
-                <div class="url-display" id="urlDisplay" title="${s}">${s}</div>
+                <div class="url-display" id="urlDisplay" title="${url}">${url}</div>
                 <div class="nav-buttons">
                   <button class="nav-button" id="backBtn" title="上一页">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -666,7 +784,7 @@ async function C(s, t, e = "maximized", o, i) {
             </div>
           </div>
           <div class="webview-container">
-            <webview id="webview" src="${s}" nodeintegration="false" contextIsolation="true" webpreferences="contextIsolation=true,nodeIntegration=false"></webview>
+            <webview id="webview" src="${url}" nodeintegration="false" contextIsolation="true" webpreferences="contextIsolation=true,nodeIntegration=false"></webview>
           </div>
         </div>
         <script>
@@ -715,6 +833,22 @@ async function C(s, t, e = "maximized", o, i) {
             // 预留新标签页功能
             alert('多标签页功能开发中...');
           });
+
+          // 监听窗口状态变化，更新最大化按钮图标
+          if (window.ipcRenderer) {
+            window.ipcRenderer.on('window-state-changed', (event, isMaximized) => {
+              const maximizeIcon = maximizeBtn.querySelector('svg');
+              if (isMaximized) {
+                // VS Code风格的还原图标 - 两个重叠的方框
+                maximizeIcon.innerHTML = '<rect x="2" y="2" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1"/><rect x="4" y="4" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1"/>';
+                maximizeBtn.title = '向下还原';
+              } else {
+                // 最大化图标 - 保持简洁的方框
+                maximizeIcon.innerHTML = '<rect x="1" y="1" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1"/>';
+                maximizeBtn.title = '最大化';
+              }
+            });
+          }
 
 
           // 更新URL显示和按钮状态
@@ -777,24 +911,34 @@ async function C(s, t, e = "maximized", o, i) {
       </body>
     </html>
   `;
-  return r.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(u)), o && r.setTitle(o), r.webContents.on("dom-ready", () => {
-    const d = w.getWebsites().find((b) => b.url === s);
-    d && d.customButtons && r.webContents.executeJavaScript(`
+  childWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(htmlContent));
+  if (websiteName) {
+    childWin.setTitle(websiteName);
+  }
+  childWin.webContents.on("dom-ready", () => {
+    const websiteData = storageService.getWebsites().find((w) => w.url === url);
+    if (websiteData && websiteData.customButtons) {
+      childWin.webContents.executeJavaScript(`
         window.postMessage({
           type: 'updateCustomButtons',
-          buttons: ${JSON.stringify(d.customButtons)}
+          buttons: ${JSON.stringify(websiteData.customButtons)}
         }, '*');
       `);
-  }), r.webContents.on("ipc-message", (d, b, ...y) => {
-    if (b === "requestCustomButtons") {
-      const m = w.getWebsites().find((E) => E.url === s);
-      m && m.customButtons && d.sender.send("updateCustomButtons", m.customButtons);
-    } else if (b === "openNewWindow") {
-      const [m, E] = y;
-      C(m, Date.now().toString(), "maximized", E);
     }
-  }), r.webContents.on("dom-ready", () => {
-    r.webContents.executeJavaScript(`
+  });
+  childWin.webContents.on("ipc-message", (event, channel, ...args) => {
+    if (channel === "requestCustomButtons") {
+      const websiteData = storageService.getWebsites().find((w) => w.url === url);
+      if (websiteData && websiteData.customButtons) {
+        event.sender.send("updateCustomButtons", websiteData.customButtons);
+      }
+    } else if (channel === "openNewWindow") {
+      const [url2, name] = args;
+      createChildWindow(url2, Date.now().toString(), "maximized", name);
+    }
+  });
+  childWin.webContents.on("dom-ready", () => {
+    childWin.webContents.executeJavaScript(`
       window.addEventListener('message', (event) => {
         if (event.data.type === 'openAddCustomButton') {
           // 向主进程发送添加自定义按钮的请求
@@ -812,92 +956,158 @@ async function C(s, t, e = "maximized", o, i) {
         }
       });
     `);
-  }), T.set(t, r), r.on("closed", () => {
-    T.delete(t);
-  }), r.webContents.on("page-title-updated", (d, b) => {
-    o ? (d.preventDefault(), r.setTitle(o)) : r.setTitle(b);
-  }), r;
+  });
+  childWindows.set(windowId, childWin);
+  childWin.on("closed", () => {
+    childWindows.delete(windowId);
+  });
+  childWin.webContents.on("page-title-updated", (event, title) => {
+    if (websiteName) {
+      event.preventDefault();
+      childWin.setTitle(websiteName);
+    } else {
+      childWin.setTitle(title);
+    }
+  });
+  return childWin;
 }
-function F() {
-  c.handle("get-websites", () => w.getWebsites()), c.handle("add-website", (s, t) => w.addWebsite(t)), c.handle("update-website", (s, t, e) => w.updateWebsite(t, e)), c.handle("delete-website", (s, t) => w.deleteWebsite(t)), c.handle("add-custom-button", (s, t, e) => w.addCustomButton(t, e)), c.handle("update-custom-button", (s, t, e, o) => w.updateCustomButton(t, e, o)), c.handle("delete-custom-button", (s, t, e) => w.deleteCustomButton(t, e)), c.handle("create-window", async (s, t, e = "maximized", o, i) => {
-    const n = Date.now().toString();
-    return await C(t, n, e, o, i), n;
-  }), c.handle("navigate-to-url", (s, t, e) => {
-    const o = T.get(t);
-    o && o.webContents.loadURL(e);
-  }), c.handle("add-to-desktop", async (s, t) => {
+function setupIpcHandlers() {
+  ipcMain.handle("get-websites", () => {
+    return storageService.getWebsites();
+  });
+  ipcMain.handle("add-website", (_event, website) => {
+    return storageService.addWebsite(website);
+  });
+  ipcMain.handle("update-website", (_event, id, updates) => {
+    return storageService.updateWebsite(id, updates);
+  });
+  ipcMain.handle("delete-website", (_event, id) => {
+    return storageService.deleteWebsite(id);
+  });
+  ipcMain.handle("add-custom-button", (_event, websiteId, button) => {
+    return storageService.addCustomButton(websiteId, button);
+  });
+  ipcMain.handle("update-custom-button", (_event, websiteId, buttonId, updates) => {
+    return storageService.updateCustomButton(websiteId, buttonId, updates);
+  });
+  ipcMain.handle("delete-custom-button", (_event, websiteId, buttonId) => {
+    return storageService.deleteCustomButton(websiteId, buttonId);
+  });
+  ipcMain.handle("create-window", async (_event, url, windowMode = "maximized", websiteName, websiteIcon) => {
+    const windowId = Date.now().toString();
+    await createChildWindow(url, windowId, windowMode, websiteName, websiteIcon);
+    return windowId;
+  });
+  ipcMain.handle("navigate-to-url", (_event, windowId, url) => {
+    const childWin = childWindows.get(windowId);
+    if (childWin) {
+      childWin.webContents.loadURL(url);
+    }
+  });
+  ipcMain.handle("add-to-desktop", async (_event, websiteData) => {
     try {
-      const e = g.getPath("desktop"), o = p.join(e, `${t.name}.lnk`), i = process.execPath;
-      let n = i;
-      if (t.icon && t.icon.includes("favicon.ico"))
+      const desktopPath = app.getPath("desktop");
+      const shortcutPath = path$1.join(desktopPath, `${websiteData.name}.lnk`);
+      const exePath = process.execPath;
+      let iconPath = exePath;
+      if (websiteData.icon && websiteData.icon.includes("favicon.ico")) {
         try {
-          const r = await S(t.icon, t.id || Date.now().toString());
-          r && (n = r);
-        } catch {
+          const faviconPath = await downloadIcon(websiteData.icon, websiteData.id || Date.now().toString());
+          if (faviconPath) {
+            iconPath = faviconPath;
+          }
+        } catch (err) {
           console.log("favicon.ico下载失败，尝试备用方案");
         }
-      if (n === i && t.url)
+      }
+      if (iconPath === exePath && websiteData.url) {
         try {
-          const u = `${new URL(t.url).origin}/favicon.ico`, d = await S(u, `root_${t.id || Date.now().toString()}`);
-          d && (n = d);
-        } catch {
+          const urlObj = new URL(websiteData.url);
+          const rootFaviconUrl = `${urlObj.origin}/favicon.ico`;
+          const rootFaviconPath = await downloadIcon(rootFaviconUrl, `root_${websiteData.id || Date.now().toString()}`);
+          if (rootFaviconPath) {
+            iconPath = rootFaviconPath;
+          }
+        } catch (err) {
           console.log("根目录favicon获取失败");
         }
-      if (n === i) {
-        const r = p.join(process.env.VITE_PUBLIC || x, "icon.ico");
-        f.existsSync(r) && (n = r);
       }
-      if (M.writeShortcutLink(o, {
-        target: i,
-        args: `--website-url="${t.url}" --website-name="${t.name}"`,
-        description: t.name,
-        icon: n,
+      if (iconPath === exePath) {
+        const appIconPath = path$1.join(process.env.VITE_PUBLIC || __dirname$1, "icon.ico");
+        if (fs$1.existsSync(appIconPath)) {
+          iconPath = appIconPath;
+        }
+      }
+      const success = shell.writeShortcutLink(shortcutPath, {
+        target: exePath,
+        args: `--website-url="${websiteData.url}" --website-name="${websiteData.name}"`,
+        description: websiteData.name,
+        icon: iconPath,
         iconIndex: 0
-      }))
-        return { success: !0, iconPath: n };
-      throw new Error("创建快捷方式失败");
-    } catch (e) {
-      throw console.error("添加到桌面失败:", e), e;
+      });
+      if (success) {
+        return { success: true, iconPath };
+      } else {
+        throw new Error("创建快捷方式失败");
+      }
+    } catch (error) {
+      console.error("添加到桌面失败:", error);
+      throw error;
     }
-  }), c.handle("get-settings", () => B.getSettings()), c.handle("save-settings", (s, t) => {
-    const e = B.updateSettings(t);
-    return t.autoStart !== void 0 && B.setAutoStart(t.autoStart).catch(console.error), e;
-  }), c.handle("get-auto-start-status", () => B.getAutoStartStatus()), c.on("open-add-custom-button", (s, t) => {
-    console.log("Received open-add-custom-button message (legacy):", t);
-  }), c.on("open-custom-button-manager", async (s, t) => {
-    console.log("Opening custom button manager for:", t);
-    const { websiteUrl: e } = t, i = w.getWebsites().find((u) => u.url === e);
-    if (!i) {
-      console.error("Website not found:", e);
+  });
+  ipcMain.handle("get-settings", () => {
+    return settingsService.getSettings();
+  });
+  ipcMain.handle("save-settings", (_event, settings) => {
+    const updatedSettings = settingsService.updateSettings(settings);
+    if (settings.autoStart !== void 0) {
+      settingsService.setAutoStart(settings.autoStart).catch(console.error);
+    }
+    return updatedSettings;
+  });
+  ipcMain.handle("get-auto-start-status", () => {
+    return settingsService.getAutoStartStatus();
+  });
+  ipcMain.on("open-add-custom-button", (_event, data) => {
+    console.log("Received open-add-custom-button message (legacy):", data);
+  });
+  ipcMain.on("open-custom-button-manager", async (event, data) => {
+    console.log("Opening custom button manager for:", data);
+    const { websiteUrl } = data;
+    const websites = storageService.getWebsites();
+    const website = websites.find((w) => w.url === websiteUrl);
+    if (!website) {
+      console.error("Website not found:", websiteUrl);
       return;
     }
-    const n = new h({
+    const managerWindow = new BrowserWindow({
       width: 720,
       height: 650,
-      parent: h.fromWebContents(s.sender) || void 0,
+      parent: BrowserWindow.fromWebContents(event.sender) || void 0,
       // 设置为子窗口
-      modal: !0,
+      modal: true,
       // 模态窗口
-      frame: !1,
+      frame: false,
       titleBarStyle: "hidden",
-      resizable: !1,
-      show: !1,
+      resizable: false,
+      show: false,
       // 先不显示，等加载完成再显示
       webPreferences: {
-        preload: p.join(x, "preload.mjs"),
-        contextIsolation: !0,
-        nodeIntegration: !1,
-        webviewTag: !0
+        preload: path$1.join(__dirname$1, "preload.mjs"),
+        contextIsolation: true,
+        nodeIntegration: false,
+        webviewTag: true
       }
     });
-    n.setTitle(`管理自定义按钮 - ${i.name}`);
-    const a = JSON.stringify(i), r = `
+    managerWindow.setTitle(`管理自定义按钮 - ${website.name}`);
+    const websiteData = JSON.stringify(website);
+    const htmlContent = `
       <!DOCTYPE html>
       <html lang="zh-CN">
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>管理自定义按钮 - ${i.name}</title>
+        <title>管理自定义按钮 - ${website.name}</title>
         <link rel="stylesheet" href="https://unpkg.com/ant-design-vue@3.2.20/dist/antd.css">
         <style>
           body {
@@ -975,7 +1185,7 @@ function F() {
         <!-- 自定义标题栏 -->
         <div class="title-bar">
           <div class="title-bar-content">
-            <span class="app-title">管理自定义按钮 - ${i.name}</span>
+            <span class="app-title">管理自定义按钮 - ${website.name}</span>
           </div>
           <div class="window-controls">
             <button class="window-control close" id="closeBtn" title="关闭">
@@ -1005,7 +1215,7 @@ function F() {
 
         <script>
           // 简化的自定义按钮管理 - 使用原生JavaScript + Ant Design样式
-          let currentWebsite = ${a};
+          let currentWebsite = ${websiteData};
 
           // 初始化
           document.addEventListener('DOMContentLoaded', function() {
@@ -1151,7 +1361,7 @@ function F() {
           function reloadWebsite() {
             if (window.ipcRenderer) {
               window.ipcRenderer.invoke('get-websites').then(websites => {
-                const updatedWebsite = websites.find(w => w.id === '${i.id}');
+                const updatedWebsite = websites.find(w => w.id === '${website.id}');
                 if (updatedWebsite) {
                   currentWebsite = updatedWebsite;
                   loadButtons();
@@ -1163,64 +1373,93 @@ function F() {
       </body>
       </html>
     `;
-    n.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(r)}`), n.once("ready-to-show", () => {
-      n.show();
-    }), c.on("window-control", (u, d) => {
-      if (u.sender === n.webContents)
-        switch (d) {
+    managerWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+    managerWindow.once("ready-to-show", () => {
+      managerWindow.show();
+    });
+    ipcMain.on("window-control", (event2, action) => {
+      if (event2.sender === managerWindow.webContents) {
+        switch (action) {
           case "close":
-            n.close();
+            managerWindow.close();
             break;
         }
-    }), n.on("closed", () => {
-      const u = h.fromWebContents(s.sender);
-      u && u.webContents.executeJavaScript(`
+      }
+    });
+    managerWindow.on("closed", () => {
+      const parentWindow = BrowserWindow.fromWebContents(event.sender);
+      if (parentWindow) {
+        parentWindow.webContents.executeJavaScript(`
           window.postMessage({
             type: 'customButtonsUpdated',
-            websiteId: '${i.id}'
+            websiteId: '${website.id}'
           }, '*');
         `);
+      }
     });
-  }), c.on("window-control", (s, t) => {
-    const e = h.fromWebContents(s.sender);
-    if (e)
-      switch (t) {
+  });
+  ipcMain.on("window-control", (event, action) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window) {
+      switch (action) {
         case "minimize":
-          e.minimize();
+          window.minimize();
           break;
         case "maximize":
-          e.isMaximized() ? (e.unmaximize(), e.webContents.send("window-state-changed", !1)) : (e.maximize(), e.webContents.send("window-state-changed", !0));
+          if (window.isMaximized()) {
+            window.unmaximize();
+            window.webContents.send("window-state-changed", false);
+          } else {
+            window.maximize();
+            window.webContents.send("window-state-changed", true);
+          }
           break;
         case "close":
-          e.close();
+          window.close();
           break;
       }
+    }
   });
 }
-g.on("window-all-closed", () => {
-  process.platform !== "darwin" && (g.quit(), l = null);
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+    win = null;
+  }
 });
-g.on("activate", () => {
-  h.getAllWindows().length === 0 && L().catch(console.error);
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow().catch(console.error);
+  }
 });
-g.whenReady().then(() => {
-  F();
-  const s = process.argv.find((e) => e.startsWith("--website-url=")), t = process.argv.find((e) => e.startsWith("--website-name="));
-  if (s) {
-    const e = s.split("=")[1].replace(/"/g, ""), o = t ? t.split("=")[1].replace(/"/g, "") : void 0, i = Date.now().toString();
-    C(e, i, "maximized", o).catch(console.error);
-  } else
-    L().catch(console.error);
+app.whenReady().then(() => {
+  setupIpcHandlers();
+  const websiteUrlArg = process.argv.find((arg) => arg.startsWith("--website-url="));
+  const websiteNameArg = process.argv.find((arg) => arg.startsWith("--website-name="));
+  if (websiteUrlArg) {
+    const url = websiteUrlArg.split("=")[1].replace(/"/g, "");
+    const websiteName = websiteNameArg ? websiteNameArg.split("=")[1].replace(/"/g, "") : void 0;
+    const windowId = Date.now().toString();
+    createChildWindow(url, windowId, "maximized", websiteName).catch(console.error);
+  } else {
+    createWindow().catch(console.error);
+  }
 });
-g.on("second-instance", (s, t) => {
-  const e = t.find((i) => i.startsWith("--website-url=")), o = t.find((i) => i.startsWith("--website-name="));
-  if (e) {
-    const i = e.split("=")[1].replace(/"/g, ""), n = o ? o.split("=")[1].replace(/"/g, "") : void 0, a = Date.now().toString();
-    C(i, a, "maximized", n).catch(console.error);
-  } else l && (l.isMinimized() && l.restore(), l.focus());
+app.on("second-instance", (_event, commandLine) => {
+  const websiteUrlArg = commandLine.find((arg) => arg.startsWith("--website-url="));
+  const websiteNameArg = commandLine.find((arg) => arg.startsWith("--website-name="));
+  if (websiteUrlArg) {
+    const url = websiteUrlArg.split("=")[1].replace(/"/g, "");
+    const websiteName = websiteNameArg ? websiteNameArg.split("=")[1].replace(/"/g, "") : void 0;
+    const windowId = Date.now().toString();
+    createChildWindow(url, windowId, "maximized", websiteName).catch(console.error);
+  } else if (win) {
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  }
 });
 export {
-  Z as MAIN_DIST,
-  z as RENDERER_DIST,
-  I as VITE_DEV_SERVER_URL
+  MAIN_DIST,
+  RENDERER_DIST,
+  VITE_DEV_SERVER_URL
 };

@@ -696,6 +696,22 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
             alert('多标签页功能开发中...');
           });
 
+          // 监听窗口状态变化，更新最大化按钮图标
+          if (window.ipcRenderer) {
+            window.ipcRenderer.on('window-state-changed', (event, isMaximized) => {
+              const maximizeIcon = maximizeBtn.querySelector('svg');
+              if (isMaximized) {
+                // VS Code风格的还原图标 - 两个重叠的方框
+                maximizeIcon.innerHTML = '<rect x="2" y="2" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1"/><rect x="4" y="4" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1"/>';
+                maximizeBtn.title = '向下还原';
+              } else {
+                // 最大化图标 - 保持简洁的方框
+                maximizeIcon.innerHTML = '<rect x="1" y="1" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1"/>';
+                maximizeBtn.title = '最大化';
+              }
+            });
+          }
+
 
           // 更新URL显示和按钮状态
           webview.addEventListener('dom-ready', () => {
