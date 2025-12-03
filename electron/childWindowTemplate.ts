@@ -1,4 +1,4 @@
-export function buildChildWindowHtml(url: string, websiteName?: string, websiteId?: string): string {
+export function buildChildWindowHtml(url: string, websiteName?: string, websiteId?: string, partition?: string): string {
   return `
     <!DOCTYPE html>
     <html>
@@ -360,6 +360,152 @@ export function buildChildWindowHtml(url: string, websiteName?: string, websiteI
             flex-direction: column;
             height: 100vh;
           }
+          /* 账号管理弹窗样式 */
+          .account-modal-mask {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.35);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+          }
+          .account-modal-mask.show {
+            display: flex;
+          }
+          .account-modal {
+            width: 420px;
+            max-width: calc(100% - 40px);
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            padding: 16px 20px 20px;
+            box-sizing: border-box;
+          }
+          .account-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+          }
+          .account-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: rgba(0, 0, 0, 0.88);
+          }
+          .account-modal-close {
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            padding: 4px;
+          }
+          .account-modal-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 8px;
+            margin-bottom: 12px;
+          }
+          .account-list {
+            max-height: 260px;
+            overflow-y: auto;
+            border: 1px solid #f0f0f0;
+            border-radius: 6px;
+          }
+          .account-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+          }
+          .account-item:last-child {
+            border-bottom: none;
+          }
+          .account-item-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+          }
+          .account-name {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+          .account-tag-default {
+            font-size: 11px;
+            color: #52c41a;
+            padding: 0 6px;
+            border-radius: 10px;
+            background: #f6ffed;
+            border: 1px solid #b7eb8f;
+          }
+          .account-actions {
+            display: flex;
+            gap: 6px;
+          }
+          .account-small-btn {
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            background: #ffffff;
+            padding: 2px 6px;
+            font-size: 12px;
+            cursor: pointer;
+          }
+          .account-small-btn:hover {
+            color: #40a9ff;
+            border-color: #40a9ff;
+          }
+          .account-small-btn-danger {
+            border-color: #ff4d4f;
+            color: #ff4d4f;
+          }
+          .account-small-btn-danger:hover {
+            background: #fff1f0;
+          }
+          .account-empty {
+            padding: 24px 12px;
+            text-align: center;
+            color: rgba(0, 0, 0, 0.45);
+            font-size: 13px;
+          }
+          .account-input-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+          }
+          .account-input {
+            flex: 1;
+            height: 28px;
+            border-radius: 4px;
+            border: 1px solid #d9d9d9;
+            padding: 0 8px;
+            font-size: 13px;
+            outline: none;
+          }
+          .account-input:focus {
+            border-color: #40a9ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+          }
+          .account-input-error {
+            border-color: #ff4d4f;
+          }
+          .account-input-error-text {
+            margin-top: 4px;
+            font-size: 12px;
+            color: #ff4d4f;
+          }
+          .account-modal-footer {
+            margin-top: 12px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+          }
         </style>
       </head>
       <body>
@@ -439,12 +585,52 @@ export function buildChildWindowHtml(url: string, websiteName?: string, websiteI
             </div>
           </div>
           <div class="webview-container">
-            <webview id="webview" src="${url}" nodeintegration="false" contextIsolation="true" webpreferences="contextIsolation=true,nodeIntegration=false" allowpopups="true" webSecurity="true"></webview>
+            <webview id="webview" src="${url}" ${partition ? 'partition="' + partition + '"' : ''} nodeintegration="false" contextIsolation="true" webpreferences="contextIsolation=true,nodeIntegration=false" allowpopups="true" webSecurity="true"></webview>
+          </div>
+          <!-- 账号管理弹窗 -->
+          <div class="account-modal-mask" id="accountModalMask">
+            <div class="account-modal">
+              <div class="account-modal-header">
+                <div class="account-modal-title">添加账号</div>
+                <button class="account-modal-close" id="accountModalClose">×</button>
+              </div>
+              <div class="account-modal-toolbar">
+                <button class="ant-btn ant-btn-primary" id="accountAddBtn" style="font-size: 12px; padding: 2px 10px; height: 28px;">添加</button>
+              </div>
+              <div class="account-list" id="accountList"></div>
+              <div class="account-modal-footer">
+                <button class="ant-btn ant-btn-default" id="accountCancelBtn" style="font-size: 12px; padding: 2px 10px; height: 28px;">取消</button>
+                <button class="ant-btn ant-btn-success" id="accountConfirmBtn" style="font-size: 12px; padding: 2px 10px; height: 28px;">确定</button>
+              </div>
+              <!-- 内部添加/编辑账号的输入区域 -->
+              <div class="account-input-row" id="accountInputRow" style="display: none;">
+                <input class="account-input" id="accountNameInput" placeholder="账号名称" />
+                <button class="ant-btn ant-btn-primary" id="accountSaveBtn" style="font-size: 12px; padding: 0 10px; height: 28px;">保存</button>
+              </div>
+              <div class="account-input-error-text" id="accountNameError" style="display: none;">账号名称不能为空</div>
+            </div>
           </div>
         </div>
         <script>
           const websiteId = '${websiteId || ''}';
           const webview = document.getElementById('webview');
+          const accountModalMask = document.getElementById('accountModalMask');
+          const accountModalClose = document.getElementById('accountModalClose');
+          const accountAddBtn = document.getElementById('accountAddBtn');
+          const accountList = document.getElementById('accountList');
+          const accountCancelBtn = document.getElementById('accountCancelBtn');
+          const accountConfirmBtn = document.getElementById('accountConfirmBtn');
+          const accountInputRow = document.getElementById('accountInputRow');
+          const accountNameInput = document.getElementById('accountNameInput');
+          const accountNameError = document.getElementById('accountNameError');
+          const accountSaveBtn = document.getElementById('accountSaveBtn');
+
+          let accountState = {
+            key: '',
+            list: [],
+            selectedAccountId: '',
+            editingAccountId: '',
+          };
           const backBtn = document.getElementById('backBtn');
           const forwardBtn = document.getElementById('forwardBtn');
           const homeBtn = document.getElementById('homeBtn');
@@ -532,6 +718,10 @@ export function buildChildWindowHtml(url: string, websiteName?: string, websiteI
             newWebview.setAttribute('webpreferences', 'contextIsolation=true,nodeIntegration=false');
             newWebview.setAttribute('allowpopups', 'true'); // 明确设置为true以允许弹出窗口被拦截
             newWebview.setAttribute('webSecurity', 'true'); // 启用Web安全
+            const basePartition = webview && webview.getAttribute('partition');
+            if (basePartition) {
+              newWebview.setAttribute('partition', basePartition);
+            }
 
             document.querySelector('.webview-container').appendChild(newWebview);
 
@@ -614,6 +804,23 @@ export function buildChildWindowHtml(url: string, websiteName?: string, websiteI
                 }
                 updateNavButtons();
               }
+
+              // 如果有待恢复的存储快照，在首次 dom-ready 时应用
+              if (window.__pendingStorageSnapshot) {
+                try {
+                  var snapshot = window.__pendingStorageSnapshot;
+                  window.__pendingStorageSnapshot = null;
+                  var script = '(function(){try{var snapshot=' + JSON.stringify(snapshot) + ';' +
+                    'var apply=function(target,data){if(!target||!data)return;for(var key in data){if(!Object.prototype.hasOwnProperty.call(data,key))continue;try{var value=data[key];if(value===null||typeof value==="undefined"){target.removeItem(key);}else{target.setItem(key,String(value));}}catch(e){}}};' +
+                    'apply(window.localStorage,snapshot.localStorage);' +
+                    'apply(window.sessionStorage,snapshot.sessionStorage);' +
+                    '}catch(e){console.warn("恢复本地存储快照失败:",e);}})();';
+                  wv.executeJavaScript(script).catch(function(e){console.error('应用存储快照失败:', e);});
+                } catch (e) {
+                  console.error('构造存储快照脚本失败:', e);
+                  window.__pendingStorageSnapshot = null;
+                }
+              }
             });
 
             wv.addEventListener('did-navigate', () => {
@@ -669,6 +876,73 @@ export function buildChildWindowHtml(url: string, websiteName?: string, websiteI
               backBtn.disabled = true;
               forwardBtn.disabled = true;
             }
+          }
+
+          // 根据账号 partition 重建 webview，会清空所有标签页并只保留一个默认标签页
+          function switchToAccountPartition(partition, storageSnapshot) {
+            if (!partition) {
+              return;
+            }
+            var container = document.querySelector('.webview-container');
+            if (!container) {
+              return;
+            }
+
+            // 记录待应用的存储快照，在新 webview dom-ready 时恢复
+            if (storageSnapshot) {
+              window.__pendingStorageSnapshot = storageSnapshot;
+            } else {
+              window.__pendingStorageSnapshot = null;
+            }
+
+            // 移除容器内所有 webview
+            var existingWebviews = container.querySelectorAll('webview');
+            existingWebviews.forEach(function (wv) {
+              try {
+                wv.remove();
+              } catch (e) {}
+            });
+
+            // 重置标签页状态，只保留默认标签配置
+            tabs = [];
+            activeTabId = 'default';
+
+            var newWebview = document.createElement('webview');
+            newWebview.id = 'webview';
+            newWebview.style.cssText = 'width: 100%; height: 100%;';
+            newWebview.setAttribute('nodeintegration', 'false');
+            newWebview.setAttribute('contextIsolation', 'true');
+            newWebview.setAttribute('webpreferences', 'contextIsolation=true,nodeIntegration=false');
+            newWebview.setAttribute('allowpopups', 'true');
+            newWebview.setAttribute('webSecurity', 'true');
+            newWebview.setAttribute('partition', partition);
+
+            var targetUrl = (urlInput && urlInput.value) || '${url}';
+            if (targetUrl && (targetUrl.indexOf('http://') === 0 || targetUrl.indexOf('https://') === 0)) {
+              newWebview.src = targetUrl;
+            } else {
+              newWebview.src = '${url}';
+            }
+
+            container.appendChild(newWebview);
+
+            window.currentWebview = newWebview;
+            setupWebviewListeners(newWebview);
+
+            tabs.push({
+              id: 'default',
+              url: newWebview.src,
+              title: '${websiteName || '新标签页'}',
+              webview: newWebview,
+            });
+
+            setTimeout(function () {
+              if (urlInput) {
+                urlInput.value = newWebview.src;
+                urlInput.title = newWebview.src;
+              }
+              updateNavButtons();
+            }, 200);
           }
 
           // 标签页点击事件委托
@@ -845,14 +1119,330 @@ export function buildChildWindowHtml(url: string, websiteName?: string, websiteI
             });
           }
 
-          switchBtn.addEventListener('click', () => {
-            const currentWv = window.currentWebview;
-            if (currentWv && currentWv.src) {
-              if (window.ipcRenderer) {
-                window.ipcRenderer.send('open-external', currentWv.src);
+          function getAccountKey() {
+            try {
+              const currentWv = window.currentWebview || webview;
+              const currentUrl = currentWv && currentWv.src ? currentWv.src : '${url}';
+              const u = new URL(currentUrl);
+              return u.origin;
+            } catch (e) {
+              try {
+                const u = new URL('${url}');
+                return u.origin;
+              } catch {
+                return websiteId || 'default-account-key';
               }
             }
-          });
+          }
+
+          async function loadAccounts() {
+            if (!window.ipcRenderer) return;
+            const key = getAccountKey();
+            accountState.key = key;
+            try {
+              let group = await window.ipcRenderer.invoke('account-get-list', { key });
+
+              if (!group || !Array.isArray(group.accounts)) {
+                group = { key, accounts: [], lastUsedAccountId: undefined };
+              }
+
+              if ((!group.accounts || group.accounts.length === 0) && window.currentWebview && window.currentWebview.getWebContentsId && window.currentWebview.executeJavaScript) {
+                const currentWv = window.currentWebview;
+                const webContentsId = currentWv.getWebContentsId();
+                const currentUrl = currentWv.src || '${url}';
+                try {
+                  const storageSnapshot = await currentWv.executeJavaScript('(function(){try{var makePlain=function(storage){var result={};if(!storage)return result;for(var i=0;i<storage.length;i++){var key=storage.key(i);try{result[key]=storage.getItem(key);}catch(e){result[key]=null;}}return result;};return{localStorage:makePlain(window.localStorage),sessionStorage:makePlain(window.sessionStorage)};}catch(e){console.warn("读取本地存储快照失败:",e);return{localStorage:{},sessionStorage:{}};}})();');
+                  group = await window.ipcRenderer.invoke('account-save-from-cookies', {
+                    key,
+                    name: '默认',
+                    webContentsId,
+                    url: currentUrl,
+                    storage: storageSnapshot,
+                  });
+                } catch (autoError) {
+                  console.warn('自动创建默认账号失败，将继续使用空列表:', autoError);
+                }
+              }
+
+              accountState.list = Array.isArray(group.accounts) ? group.accounts : [];
+              accountState.selectedAccountId = group.lastUsedAccountId || (accountState.list[0] && accountState.list[0].id) || '';
+              renderAccountList();
+            } catch (error) {
+              console.error('加载账号列表失败:', error);
+            }
+          }
+
+          function openAccountModal() {
+            if (!accountModalMask) return;
+            accountModalMask.classList.add('show');
+            accountInputRow.style.display = 'none';
+            accountNameError.style.display = 'none';
+            accountNameInput.value = '';
+            accountState.editingAccountId = '';
+            loadAccounts();
+          }
+
+          function closeAccountModal() {
+            if (!accountModalMask) return;
+            accountModalMask.classList.remove('show');
+          }
+
+          function renderAccountList() {
+            if (!accountList) return;
+            accountList.innerHTML = '';
+
+            if (!accountState.list || accountState.list.length === 0) {
+              const empty = document.createElement('div');
+              empty.className = 'account-empty';
+              empty.textContent = '暂无账号，点击上方“添加”保存当前登录状态为一个账号。';
+              accountList.appendChild(empty);
+              return;
+            }
+
+            accountState.list.forEach((item) => {
+              const row = document.createElement('div');
+              row.className = 'account-item';
+
+              const left = document.createElement('div');
+              left.className = 'account-item-left';
+
+              const radio = document.createElement('input');
+              radio.type = 'radio';
+              radio.name = 'account-radio';
+              radio.value = item.id;
+              if (item.id === accountState.selectedAccountId) {
+                radio.checked = true;
+              }
+
+              const nameSpan = document.createElement('span');
+              nameSpan.className = 'account-name';
+              nameSpan.textContent = item.name || '未命名账号';
+
+              left.appendChild(radio);
+              left.appendChild(nameSpan);
+
+              if (item.id === accountState.list[0].id) {
+                const tag = document.createElement('span');
+                tag.className = 'account-tag-default';
+                tag.textContent = '默认';
+                left.appendChild(tag);
+              }
+
+              const actions = document.createElement('div');
+              actions.className = 'account-actions';
+
+              const editBtn = document.createElement('button');
+              editBtn.className = 'account-small-btn';
+              editBtn.textContent = '编辑';
+              editBtn.addEventListener('click', () => {
+                accountInputRow.style.display = 'flex';
+                accountNameError.style.display = 'none';
+                accountNameInput.value = item.name || '';
+                accountState.editingAccountId = item.id;
+                accountNameInput.focus();
+              });
+
+              const deleteBtn = document.createElement('button');
+              deleteBtn.className = 'account-small-btn account-small-btn-danger';
+              deleteBtn.textContent = '删除';
+              deleteBtn.addEventListener('click', async () => {
+                if (!window.ipcRenderer) return;
+                try {
+                  await window.ipcRenderer.invoke('account-delete', { key: accountState.key || getAccountKey(), accountId: item.id });
+                  await loadAccounts();
+                } catch (error) {
+                  console.error('删除账号失败:', error);
+                }
+              });
+
+              actions.appendChild(editBtn);
+              actions.appendChild(deleteBtn);
+
+              row.appendChild(left);
+              row.appendChild(actions);
+
+              row.addEventListener('click', (event) => {
+                if (event.target === editBtn || event.target === deleteBtn) {
+                  return;
+                }
+                accountState.selectedAccountId = item.id;
+                renderAccountList();
+              });
+
+              radio.addEventListener('change', () => {
+                accountState.selectedAccountId = item.id;
+              });
+
+              accountList.appendChild(row);
+            });
+          }
+
+          async function captureAndSaveCurrentAccountSnapshot() {
+            if (!window.ipcRenderer) return;
+            const currentWv = window.currentWebview || webview;
+            if (!currentWv || !currentWv.executeJavaScript) return;
+
+            const key = accountState.key || getAccountKey();
+            try {
+              let group = await window.ipcRenderer.invoke('account-get-list', { key });
+              if (!group || !Array.isArray(group.accounts)) {
+                group = { key: key, accounts: [], lastUsedAccountId: undefined };
+              }
+
+              const partitionAttr = currentWv.getAttribute && currentWv.getAttribute('partition');
+              let currentAccount = null;
+              if (group.accounts && group.accounts.length > 0) {
+                if (partitionAttr) {
+                  currentAccount = group.accounts.find(function (item) { return item.partition === partitionAttr; });
+                }
+                if (!currentAccount) {
+                  const fallbackId = group.lastUsedAccountId || (group.accounts[0] && group.accounts[0].id);
+                  if (fallbackId) {
+                    currentAccount = group.accounts.find(function (item) { return item.id === fallbackId; }) || currentAccount;
+                  }
+                }
+              }
+
+              const storageSnapshot = await currentWv.executeJavaScript('(function(){try{var makePlain=function(storage){var result={};if(!storage)return result;for(var i=0;i<storage.length;i++){var key=storage.key(i);try{result[key]=storage.getItem(key);}catch(e){result[key]=null;}}return result;};return{localStorage:makePlain(window.localStorage),sessionStorage:makePlain(window.sessionStorage)};}catch(e){console.warn("读取本地存储快照失败:",e);return{localStorage:{},sessionStorage:{}};}})();');
+
+              const payload = {
+                key: key,
+                accountId: currentAccount ? currentAccount.id : undefined,
+                name: currentAccount ? (currentAccount.name || '默认') : '默认',
+                storage: storageSnapshot,
+              };
+              await window.ipcRenderer.invoke('account-save-from-cookies', payload);
+            } catch (error) {
+              console.error('保存当前账号存储快照失败:', error);
+            }
+          }
+
+          if (switchBtn) {
+            switchBtn.addEventListener('click', async () => {
+              await captureAndSaveCurrentAccountSnapshot();
+              openAccountModal();
+            });
+          }
+
+          if (accountModalClose) {
+            accountModalClose.addEventListener('click', () => {
+              closeAccountModal();
+            });
+          }
+
+          if (accountCancelBtn) {
+            accountCancelBtn.addEventListener('click', () => {
+              closeAccountModal();
+            });
+          }
+
+          if (accountAddBtn) {
+            accountAddBtn.addEventListener('click', () => {
+              accountInputRow.style.display = 'flex';
+              accountNameError.style.display = 'none';
+              accountNameInput.value = '';
+              accountState.editingAccountId = '';
+              accountNameInput.focus();
+            });
+          }
+
+          function validateAccountName() {
+            const name = (accountNameInput.value || '').trim();
+            if (!name) {
+              accountNameError.style.display = 'block';
+              accountNameInput.classList.add('account-input-error');
+              return false;
+            }
+            accountNameError.style.display = 'none';
+            accountNameInput.classList.remove('account-input-error');
+            return true;
+          }
+
+          if (accountSaveBtn) {
+            accountSaveBtn.addEventListener('click', async () => {
+              if (!validateAccountName()) return;
+              if (!window.ipcRenderer) return;
+
+              const name = accountNameInput.value.trim();
+              const currentWv = window.currentWebview || webview;
+              if (!currentWv || !currentWv.getWebContentsId || !currentWv.executeJavaScript) return;
+              const webContentsId = currentWv.getWebContentsId();
+              const currentUrl = currentWv.src || '${url}';
+
+              try {
+                const storageSnapshot = await currentWv.executeJavaScript('(function(){try{var makePlain=function(storage){var result={};if(!storage)return result;for(var i=0;i<storage.length;i++){var key=storage.key(i);try{result[key]=storage.getItem(key);}catch(e){result[key]=null;}}return result;};return{localStorage:makePlain(window.localStorage),sessionStorage:makePlain(window.sessionStorage)};}catch(e){console.warn("读取本地存储快照失败:",e);return{localStorage:{},sessionStorage:{}};}})();');
+
+                const group = await window.ipcRenderer.invoke('account-save-from-cookies', {
+                  key: accountState.key || getAccountKey(),
+                  accountId: accountState.editingAccountId || undefined,
+                  name,
+                  webContentsId,
+                  url: currentUrl,
+                  storage: storageSnapshot,
+                });
+                accountState.list = Array.isArray(group.accounts) ? group.accounts : [];
+                accountState.selectedAccountId = group.lastUsedAccountId || (accountState.list[0] && accountState.list[0].id) || '';
+                accountInputRow.style.display = 'none';
+                accountNameInput.value = '';
+                accountState.editingAccountId = '';
+                renderAccountList();
+              } catch (error) {
+                console.error('保存账号失败:', error);
+              }
+            });
+          }
+
+          if (accountNameInput) {
+            accountNameInput.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter') {
+                accountSaveBtn.click();
+              }
+            });
+          }
+
+          if (accountConfirmBtn) {
+            accountConfirmBtn.addEventListener('click', async () => {
+              if (!window.ipcRenderer) {
+                closeAccountModal();
+                return;
+              }
+
+              if (!accountState.selectedAccountId && accountState.list.length > 0) {
+                accountState.selectedAccountId = accountState.list[0].id;
+              }
+
+              if (!accountState.selectedAccountId) {
+                closeAccountModal();
+                return;
+              }
+
+              try {
+                const key = accountState.key || getAccountKey();
+                const accountId = accountState.selectedAccountId;
+                const group = await window.ipcRenderer.invoke('account-apply', {
+                  key: key,
+                  accountId: accountId,
+                });
+
+                if (group && group.accounts && group.accounts.length > 0) {
+                  accountState.list = group.accounts;
+                  accountState.selectedAccountId = group.lastUsedAccountId || accountId;
+
+                  var targetAccount = group.accounts.find(function (item) {
+                    return item.id === accountState.selectedAccountId;
+                  });
+
+                  if (targetAccount && targetAccount.partition) {
+                    switchToAccountPartition(targetAccount.partition, targetAccount.storageSnapshot || null);
+                  }
+                }
+              } catch (error) {
+                console.error('切换账号失败:', error);
+              }
+
+              closeAccountModal();
+            });
+          }
 
           setupWebviewListeners(webview);
 

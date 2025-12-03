@@ -7,6 +7,7 @@ import http from 'node:http'
 import storageService from './storage'
 import { settingsService } from './services/settingsService'
 import { buildChildWindowHtml } from './childWindowTemplate'
+import { accountStorageService } from './accountStorage'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // The built directory structure
@@ -200,6 +201,15 @@ async function createWindow() {
 }
 
 // 创建子窗口
+function getAccountKeyForUrl(url: string, websiteId?: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.origin;
+  } catch {
+    return websiteId || 'default-account-key';
+  }
+}
+
 async function createChildWindow(url: string, windowId: string, windowMode: 'normal' | 'maximized' | 'fullscreen' | boolean = 'maximized', websiteName?: string, websiteIcon?: string, _width: number = 1200, _height: number = 800, websiteId?: string) {
   // 兼容旧的 boolean 类型（fullscreen 参数）
   let mode: 'normal' | 'maximized' | 'fullscreen'
@@ -207,6 +217,23 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
     mode = windowMode ? 'fullscreen' : 'maximized'
   } else {
     mode = windowMode
+  }
+
+  const accountKey = getAccountKeyForUrl(url, websiteId)
+  let activePartition: string | undefined
+  try {
+    let group = accountStorageService.getAccountsForKey(accountKey)
+    if (!group.accounts || group.accounts.length === 0) {
+      group = accountStorageService.saveAccount(accountKey, { name: '默认' })
+    }
+    const fallbackId = group.accounts[0] ? group.accounts[0].id : undefined
+    const targetId = group.lastUsedAccountId || fallbackId
+    const targetAccount = targetId ? group.accounts.find((item) => item.id === targetId) : undefined
+    if (targetAccount && targetAccount.partition) {
+      activePartition = targetAccount.partition
+    }
+  } catch (error) {
+    console.error('解析账号 partition 失败:', error)
   }
   
   // 设置窗口图标
@@ -296,7 +323,7 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
   })
 
   // 加载包含功能栏的HTML页面
-  const htmlContent = buildChildWindowHtml(url, websiteName, websiteId)
+  const htmlContent = buildChildWindowHtml(url, websiteName, websiteId, activePartition)
 
   childWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent))
 
@@ -372,6 +399,55 @@ async function createChildWindow(url: string, windowId: string, windowMode: 'nor
 
 // IPC 通信处理
 function setupIpcHandlers() {
+  // 账号管理（基于 partition 的账号槽，不再直接读写 Cookie）
+  ipcMain.handle('account-get-list', async (_event, payload: { key: string }) => {
+    const { key } = payload;
+    return accountStorageService.getAccountsForKey(key);
+  });
+
+  // 兼容旧通道名称：目前只根据 key/accountId/name 管理账号槽
+  ipcMain.handle('account-save-from-cookies', async (_event, payload: { key: string; accountId?: string; name: string; storage?: { localStorage: Record<string, string | null>; sessionStorage: Record<string, string | null> } }) => {
+    const { key, accountId, name, storage } = payload;
+    try {
+      const group = accountStorageService.saveAccount(key, {
+        id: accountId,
+        name,
+        storageSnapshot: storage,
+      });
+      return group;
+    } catch (error) {
+      console.error('保存账号失败:', error);
+      throw error;
+    }
+  });
+
+  // 兼容旧通道名称：当前仅更新 lastUsedAccountId，真正的切换逻辑后续由 partition 负责
+  ipcMain.handle('account-apply', async (_event, payload: { key: string; accountId: string }) => {
+    const { key, accountId } = payload;
+    try {
+      const data = accountStorageService.getAccountsForKey(key);
+      const account = data.accounts.find((item) => item.id === accountId);
+      if (!account) {
+        return data;
+      }
+
+      const updated = accountStorageService.setLastUsedAccount(key, accountId);
+      return updated;
+    } catch (error) {
+      console.error('应用账号失败:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('account-delete', async (_event, payload: { key: string; accountId: string }) => {
+    const { key, accountId } = payload;
+    try {
+      return accountStorageService.deleteAccount(key, accountId);
+    } catch (error) {
+      console.error('删除账号失败:', error);
+      throw error;
+    }
+  });
   // 获取所有网站
   ipcMain.handle('get-websites', () => {
     return storageService.getWebsites()

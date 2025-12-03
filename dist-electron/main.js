@@ -1,213 +1,166 @@
-var __defProp = Object.defineProperty;
-var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-import { app, BrowserWindow, ipcMain, shell } from "electron";
-import { fileURLToPath } from "node:url";
-import path$1 from "node:path";
-import fs$1 from "node:fs";
-import https from "node:https";
-import http from "node:http";
-import fs from "fs";
-import path from "path";
-const STORAGE_FILE = "websites.json";
-class StorageService {
+var q = Object.defineProperty;
+var H = (a, t, e) => t in a ? q(a, t, { enumerable: !0, configurable: !0, writable: !0, value: e }) : a[t] = e;
+var A = (a, t, e) => H(a, typeof t != "symbol" ? t + "" : t, e);
+import { app as x, BrowserWindow as z, ipcMain as l, shell as R } from "electron";
+import { fileURLToPath as J } from "node:url";
+import f from "node:path";
+import m from "node:fs";
+import V from "node:https";
+import G from "node:http";
+import y from "fs";
+import N from "path";
+const K = "websites.json";
+class Y {
   constructor() {
-    __publicField(this, "storagePath");
-    this.storagePath = path.join(app.getPath("userData"), STORAGE_FILE);
-    this.initStorage();
+    A(this, "storagePath");
+    this.storagePath = N.join(x.getPath("userData"), K), this.initStorage();
   }
   initStorage() {
-    if (!fs.existsSync(this.storagePath)) {
-      this.saveData([]);
-    }
+    y.existsSync(this.storagePath) || this.saveData([]);
   }
   loadData() {
     try {
-      const data = fs.readFileSync(this.storagePath, "utf-8");
-      return JSON.parse(data);
-    } catch (error) {
-      console.error("Error loading data:", error);
-      return [];
+      const t = y.readFileSync(this.storagePath, "utf-8");
+      return JSON.parse(t);
+    } catch (t) {
+      return console.error("Error loading data:", t), [];
     }
   }
-  saveData(websites) {
+  saveData(t) {
     try {
-      fs.writeFileSync(this.storagePath, JSON.stringify(websites, null, 2), "utf-8");
-    } catch (error) {
-      console.error("Error saving data:", error);
+      y.writeFileSync(this.storagePath, JSON.stringify(t, null, 2), "utf-8");
+    } catch (e) {
+      console.error("Error saving data:", e);
     }
   }
   getWebsites() {
     return this.loadData();
   }
-  addWebsite(website) {
-    const websites = this.loadData();
-    const newWebsite = {
-      ...website,
+  addWebsite(t) {
+    const e = this.loadData(), o = {
+      ...t,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      customButtons: website.customButtons || []
+      customButtons: t.customButtons || []
     };
-    websites.push(newWebsite);
-    this.saveData(websites);
-    return newWebsite;
+    return e.push(o), this.saveData(e), o;
   }
-  updateWebsite(id, updates) {
-    const websites = this.loadData();
-    const index = websites.findIndex((w) => w.id === id);
-    if (index === -1) return null;
-    websites[index] = { ...websites[index], ...updates };
-    this.saveData(websites);
-    return websites[index];
+  updateWebsite(t, e) {
+    const o = this.loadData(), n = o.findIndex((r) => r.id === t);
+    return n === -1 ? null : (o[n] = { ...o[n], ...e }, this.saveData(o), o[n]);
   }
-  deleteWebsite(id) {
-    const websites = this.loadData();
-    const index = websites.findIndex((w) => w.id === id);
-    if (index === -1) return false;
-    websites.splice(index, 1);
-    this.saveData(websites);
-    return true;
+  deleteWebsite(t) {
+    const e = this.loadData(), o = e.findIndex((n) => n.id === t);
+    return o === -1 ? !1 : (e.splice(o, 1), this.saveData(e), !0);
   }
-  addCustomButton(websiteId, button) {
-    const websites = this.loadData();
-    const website = websites.find((w) => w.id === websiteId);
-    if (!website) return null;
-    const newButton = {
-      ...button,
+  addCustomButton(t, e) {
+    const o = this.loadData(), n = o.find((i) => i.id === t);
+    if (!n) return null;
+    const r = {
+      ...e,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9)
     };
-    website.customButtons.push(newButton);
-    this.saveData(websites);
-    return newButton;
+    return n.customButtons.push(r), this.saveData(o), r;
   }
-  updateCustomButton(websiteId, buttonId, updates) {
-    const websites = this.loadData();
-    const website = websites.find((w) => w.id === websiteId);
-    if (!website) return null;
-    const buttonIndex = website.customButtons.findIndex((b) => b.id === buttonId);
-    if (buttonIndex === -1) return null;
-    website.customButtons[buttonIndex] = { ...website.customButtons[buttonIndex], ...updates };
-    this.saveData(websites);
-    return website.customButtons[buttonIndex];
+  updateCustomButton(t, e, o) {
+    const n = this.loadData(), r = n.find((d) => d.id === t);
+    if (!r) return null;
+    const i = r.customButtons.findIndex((d) => d.id === e);
+    return i === -1 ? null : (r.customButtons[i] = { ...r.customButtons[i], ...o }, this.saveData(n), r.customButtons[i]);
   }
-  deleteCustomButton(websiteId, buttonId) {
-    const websites = this.loadData();
-    const website = websites.find((w) => w.id === websiteId);
-    if (!website) return false;
-    const buttonIndex = website.customButtons.findIndex((b) => b.id === buttonId);
-    if (buttonIndex === -1) return false;
-    website.customButtons.splice(buttonIndex, 1);
-    this.saveData(websites);
-    return true;
+  deleteCustomButton(t, e) {
+    const o = this.loadData(), n = o.find((i) => i.id === t);
+    if (!n) return !1;
+    const r = n.customButtons.findIndex((i) => i.id === e);
+    return r === -1 ? !1 : (n.customButtons.splice(r, 1), this.saveData(o), !0);
   }
 }
-const storageService = new StorageService();
-const DEFAULT_SETTINGS = {
+const v = new Y(), _ = {
   darkMode: "manual",
   darkModeTimeStart: "18:00",
   darkModeTimeEnd: "06:00",
-  isDarkMode: false,
+  isDarkMode: !1,
   homeWindowSize: "maximized",
-  autoStart: false,
+  autoStart: !1,
   backgroundType: "default",
   backgroundColor: "#f0f2f5",
   backgroundImage: ""
 };
-class SettingsService {
+class Z {
   constructor() {
-    __publicField(this, "settingsPath");
-    __publicField(this, "settings");
-    this.settingsPath = path.join(app.getPath("userData"), "settings.json");
-    this.settings = this.loadSettings();
+    A(this, "settingsPath");
+    A(this, "settings");
+    this.settingsPath = N.join(x.getPath("userData"), "settings.json"), this.settings = this.loadSettings();
   }
   loadSettings() {
     try {
-      if (fs.existsSync(this.settingsPath)) {
-        const data = fs.readFileSync(this.settingsPath, "utf-8");
-        const parsed = JSON.parse(data);
-        return { ...DEFAULT_SETTINGS, ...parsed };
+      if (y.existsSync(this.settingsPath)) {
+        const t = y.readFileSync(this.settingsPath, "utf-8"), e = JSON.parse(t);
+        return { ..._, ...e };
       }
-    } catch (error) {
-      console.error("加载设置失败:", error);
+    } catch (t) {
+      console.error("加载设置失败:", t);
     }
-    return { ...DEFAULT_SETTINGS };
+    return { ..._ };
   }
   saveSettings() {
     try {
-      const data = JSON.stringify(this.settings, null, 2);
-      fs.writeFileSync(this.settingsPath, data, "utf-8");
-    } catch (error) {
-      console.error("保存设置失败:", error);
+      const t = JSON.stringify(this.settings, null, 2);
+      y.writeFileSync(this.settingsPath, t, "utf-8");
+    } catch (t) {
+      console.error("保存设置失败:", t);
     }
   }
   getSettings() {
     return { ...this.settings };
   }
-  updateSettings(newSettings) {
-    this.settings = { ...this.settings, ...newSettings };
-    this.saveSettings();
-    return this.settings;
+  updateSettings(t) {
+    return this.settings = { ...this.settings, ...t }, this.saveSettings(), this.settings;
   }
   // 检测是否应该使用黑暗模式
   shouldUseDarkMode() {
-    const { darkMode, darkModeTimeStart, darkModeTimeEnd, isDarkMode } = this.settings;
-    if (darkMode === "manual") {
-      return isDarkMode;
-    } else if (darkMode === "system") {
-      return false;
-    } else if (darkMode === "time") {
-      const now = /* @__PURE__ */ new Date();
-      const currentTime = now.getHours() * 60 + now.getMinutes();
-      const [startHour, startMin] = darkModeTimeStart.split(":").map(Number);
-      const [endHour, endMin] = darkModeTimeEnd.split(":").map(Number);
-      const startTime = startHour * 60 + startMin;
-      const endTime = endHour * 60 + endMin;
-      if (startTime <= endTime) {
-        return currentTime >= startTime && currentTime <= endTime;
-      } else {
-        return currentTime >= startTime || currentTime <= endTime;
-      }
+    const { darkMode: t, darkModeTimeStart: e, darkModeTimeEnd: o, isDarkMode: n } = this.settings;
+    if (t === "manual")
+      return n;
+    if (t === "system")
+      return !1;
+    if (t === "time") {
+      const r = /* @__PURE__ */ new Date(), i = r.getHours() * 60 + r.getMinutes(), [d, b] = e.split(":").map(Number), [g, I] = o.split(":").map(Number), B = d * 60 + b, s = g * 60 + I;
+      return B <= s ? i >= B && i <= s : i >= B || i <= s;
     }
-    return false;
+    return !1;
   }
   // 设置开机启动
-  async setAutoStart(enabled) {
+  async setAutoStart(t) {
     try {
-      const { app: app2 } = await import("electron");
-      app2.setLoginItemSettings({
-        openAtLogin: enabled,
-        openAsHidden: false,
-        path: app2.getPath("exe"),
-        args: enabled ? [] : ["--disable-auto-start"]
-      });
-      this.updateSettings({ autoStart: enabled });
-      console.log(`开机启动设置已${enabled ? "启用" : "禁用"}`);
-    } catch (error) {
-      console.error("设置开机启动失败:", error);
-      throw error;
+      const { app: e } = await import("electron");
+      e.setLoginItemSettings({
+        openAtLogin: t,
+        openAsHidden: !1,
+        path: e.getPath("exe"),
+        args: t ? [] : ["--disable-auto-start"]
+      }), this.updateSettings({ autoStart: t }), console.log(`开机启动设置已${t ? "启用" : "禁用"}`);
+    } catch (e) {
+      throw console.error("设置开机启动失败:", e), e;
     }
   }
   // 获取开机启动状态
   getAutoStartStatus() {
     try {
-      const { app: app2 } = require("electron");
-      const loginSettings = app2.getLoginItemSettings();
-      const isEnabled = loginSettings.openAtLogin || (loginSettings.executableWillLaunchAtLogin ?? false) || loginSettings.launchItems && loginSettings.launchItems.length > 0;
-      console.log(`获取开机启动状态: ${isEnabled ? "启用" : "禁用"}`, loginSettings);
-      return isEnabled;
-    } catch (error) {
-      console.error("获取开机启动状态失败:", error);
-      return false;
+      const { app: t } = require("electron"), e = t.getLoginItemSettings(), o = e.openAtLogin || (e.executableWillLaunchAtLogin ?? !1) || e.launchItems && e.launchItems.length > 0;
+      return console.log(`获取开机启动状态: ${o ? "启用" : "禁用"}`, e), o;
+    } catch (t) {
+      return console.error("获取开机启动状态失败:", t), !1;
     }
   }
 }
-const settingsService = new SettingsService();
-function buildChildWindowHtml(url, websiteName, websiteId) {
+const E = new Z();
+function Q(a, t, e, o) {
   return `
     <!DOCTYPE html>
     <html>
       <head>
         <meta charset="UTF-8">
-        <title>${websiteName || "WebTools"}</title>
+        <title>${t || "WebTools"}</title>
         <style>
           body {
             margin: 0;
@@ -563,6 +516,152 @@ function buildChildWindowHtml(url, websiteName, websiteId) {
             flex-direction: column;
             height: 100vh;
           }
+          /* 账号管理弹窗样式 */
+          .account-modal-mask {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.35);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+          }
+          .account-modal-mask.show {
+            display: flex;
+          }
+          .account-modal {
+            width: 420px;
+            max-width: calc(100% - 40px);
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            padding: 16px 20px 20px;
+            box-sizing: border-box;
+          }
+          .account-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+          }
+          .account-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: rgba(0, 0, 0, 0.88);
+          }
+          .account-modal-close {
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            padding: 4px;
+          }
+          .account-modal-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 8px;
+            margin-bottom: 12px;
+          }
+          .account-list {
+            max-height: 260px;
+            overflow-y: auto;
+            border: 1px solid #f0f0f0;
+            border-radius: 6px;
+          }
+          .account-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+          }
+          .account-item:last-child {
+            border-bottom: none;
+          }
+          .account-item-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+          }
+          .account-name {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+          .account-tag-default {
+            font-size: 11px;
+            color: #52c41a;
+            padding: 0 6px;
+            border-radius: 10px;
+            background: #f6ffed;
+            border: 1px solid #b7eb8f;
+          }
+          .account-actions {
+            display: flex;
+            gap: 6px;
+          }
+          .account-small-btn {
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            background: #ffffff;
+            padding: 2px 6px;
+            font-size: 12px;
+            cursor: pointer;
+          }
+          .account-small-btn:hover {
+            color: #40a9ff;
+            border-color: #40a9ff;
+          }
+          .account-small-btn-danger {
+            border-color: #ff4d4f;
+            color: #ff4d4f;
+          }
+          .account-small-btn-danger:hover {
+            background: #fff1f0;
+          }
+          .account-empty {
+            padding: 24px 12px;
+            text-align: center;
+            color: rgba(0, 0, 0, 0.45);
+            font-size: 13px;
+          }
+          .account-input-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+          }
+          .account-input {
+            flex: 1;
+            height: 28px;
+            border-radius: 4px;
+            border: 1px solid #d9d9d9;
+            padding: 0 8px;
+            font-size: 13px;
+            outline: none;
+          }
+          .account-input:focus {
+            border-color: #40a9ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+          }
+          .account-input-error {
+            border-color: #ff4d4f;
+          }
+          .account-input-error-text {
+            margin-top: 4px;
+            font-size: 12px;
+            color: #ff4d4f;
+          }
+          .account-modal-footer {
+            margin-top: 12px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+          }
         </style>
       </head>
       <body>
@@ -571,7 +670,7 @@ function buildChildWindowHtml(url, websiteName, websiteId) {
           <div class="title-bar">
             <div class="title-bar-tabs">
               <div class="tab active" id="default">
-                <span class="tab-title">${websiteName || "新标签页"}</span>
+                <span class="tab-title">${t || "新标签页"}</span>
                 <span class="tab-close" id="closeTab">×</span>
               </div>
               <button class="new-tab-btn" id="newTabBtn" title="新标签页">+</button>
@@ -604,7 +703,7 @@ function buildChildWindowHtml(url, websiteName, websiteId) {
             </div>
             <div class="toolbar-section toolbar-section-2">
               <div class="url-container">
-                <input type="text" class="url-input" id="urlInput" value="${url}" spellcheck="false">
+                <input type="text" class="url-input" id="urlInput" value="${a}" spellcheck="false">
                 <div class="nav-buttons">
                   <button class="nav-button" id="addBtn" title="新增">
                     <svg viewBox="64 64 896 896" focusable="false" data-icon="plus" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M482 152h60q8 0 8 8v704q0 8-8 8h-60q-8 0-8-8V160q0-8 8-8z"></path><path d="M176 474h672q8 0 8 8v60q0 8-8 8H176q-8 0-8-8v-60q0-8 8-8z"></path></svg>
@@ -642,12 +741,52 @@ function buildChildWindowHtml(url, websiteName, websiteId) {
             </div>
           </div>
           <div class="webview-container">
-            <webview id="webview" src="${url}" nodeintegration="false" contextIsolation="true" webpreferences="contextIsolation=true,nodeIntegration=false" allowpopups="true" webSecurity="true"></webview>
+            <webview id="webview" src="${a}" ${o ? 'partition="' + o + '"' : ""} nodeintegration="false" contextIsolation="true" webpreferences="contextIsolation=true,nodeIntegration=false" allowpopups="true" webSecurity="true"></webview>
+          </div>
+          <!-- 账号管理弹窗 -->
+          <div class="account-modal-mask" id="accountModalMask">
+            <div class="account-modal">
+              <div class="account-modal-header">
+                <div class="account-modal-title">添加账号</div>
+                <button class="account-modal-close" id="accountModalClose">×</button>
+              </div>
+              <div class="account-modal-toolbar">
+                <button class="ant-btn ant-btn-primary" id="accountAddBtn" style="font-size: 12px; padding: 2px 10px; height: 28px;">添加</button>
+              </div>
+              <div class="account-list" id="accountList"></div>
+              <div class="account-modal-footer">
+                <button class="ant-btn ant-btn-default" id="accountCancelBtn" style="font-size: 12px; padding: 2px 10px; height: 28px;">取消</button>
+                <button class="ant-btn ant-btn-success" id="accountConfirmBtn" style="font-size: 12px; padding: 2px 10px; height: 28px;">确定</button>
+              </div>
+              <!-- 内部添加/编辑账号的输入区域 -->
+              <div class="account-input-row" id="accountInputRow" style="display: none;">
+                <input class="account-input" id="accountNameInput" placeholder="账号名称" />
+                <button class="ant-btn ant-btn-primary" id="accountSaveBtn" style="font-size: 12px; padding: 0 10px; height: 28px;">保存</button>
+              </div>
+              <div class="account-input-error-text" id="accountNameError" style="display: none;">账号名称不能为空</div>
+            </div>
           </div>
         </div>
         <script>
-          const websiteId = '${websiteId || ""}';
+          const websiteId = '${e || ""}';
           const webview = document.getElementById('webview');
+          const accountModalMask = document.getElementById('accountModalMask');
+          const accountModalClose = document.getElementById('accountModalClose');
+          const accountAddBtn = document.getElementById('accountAddBtn');
+          const accountList = document.getElementById('accountList');
+          const accountCancelBtn = document.getElementById('accountCancelBtn');
+          const accountConfirmBtn = document.getElementById('accountConfirmBtn');
+          const accountInputRow = document.getElementById('accountInputRow');
+          const accountNameInput = document.getElementById('accountNameInput');
+          const accountNameError = document.getElementById('accountNameError');
+          const accountSaveBtn = document.getElementById('accountSaveBtn');
+
+          let accountState = {
+            key: '',
+            list: [],
+            selectedAccountId: '',
+            editingAccountId: '',
+          };
           const backBtn = document.getElementById('backBtn');
           const forwardBtn = document.getElementById('forwardBtn');
           const homeBtn = document.getElementById('homeBtn');
@@ -694,12 +833,12 @@ function buildChildWindowHtml(url, websiteName, websiteId) {
           newTabBtn.addEventListener('click', () => {
             try {
               // 使用首页URL创建新标签页，而不是当前URL
-              const homeUrl = '${url}';
+              const homeUrl = '${a}';
               createNewTab(homeUrl, '新标签页');
             } catch (error) {
               console.error('Error creating new tab:', error);
               // 使用默认URL创建新标签页
-              createNewTab('${url}', '新标签页');
+              createNewTab('${a}', '新标签页');
             }
           });
 
@@ -735,6 +874,10 @@ function buildChildWindowHtml(url, websiteName, websiteId) {
             newWebview.setAttribute('webpreferences', 'contextIsolation=true,nodeIntegration=false');
             newWebview.setAttribute('allowpopups', 'true'); // 明确设置为true以允许弹出窗口被拦截
             newWebview.setAttribute('webSecurity', 'true'); // 启用Web安全
+            const basePartition = webview && webview.getAttribute('partition');
+            if (basePartition) {
+              newWebview.setAttribute('partition', basePartition);
+            }
 
             document.querySelector('.webview-container').appendChild(newWebview);
 
@@ -817,6 +960,23 @@ function buildChildWindowHtml(url, websiteName, websiteId) {
                 }
                 updateNavButtons();
               }
+
+              // 如果有待恢复的存储快照，在首次 dom-ready 时应用
+              if (window.__pendingStorageSnapshot) {
+                try {
+                  var snapshot = window.__pendingStorageSnapshot;
+                  window.__pendingStorageSnapshot = null;
+                  var script = '(function(){try{var snapshot=' + JSON.stringify(snapshot) + ';' +
+                    'var apply=function(target,data){if(!target||!data)return;for(var key in data){if(!Object.prototype.hasOwnProperty.call(data,key))continue;try{var value=data[key];if(value===null||typeof value==="undefined"){target.removeItem(key);}else{target.setItem(key,String(value));}}catch(e){}}};' +
+                    'apply(window.localStorage,snapshot.localStorage);' +
+                    'apply(window.sessionStorage,snapshot.sessionStorage);' +
+                    '}catch(e){console.warn("恢复本地存储快照失败:",e);}})();';
+                  wv.executeJavaScript(script).catch(function(e){console.error('应用存储快照失败:', e);});
+                } catch (e) {
+                  console.error('构造存储快照脚本失败:', e);
+                  window.__pendingStorageSnapshot = null;
+                }
+              }
             });
 
             wv.addEventListener('did-navigate', () => {
@@ -874,6 +1034,73 @@ function buildChildWindowHtml(url, websiteName, websiteId) {
             }
           }
 
+          // 根据账号 partition 重建 webview，会清空所有标签页并只保留一个默认标签页
+          function switchToAccountPartition(partition, storageSnapshot) {
+            if (!partition) {
+              return;
+            }
+            var container = document.querySelector('.webview-container');
+            if (!container) {
+              return;
+            }
+
+            // 记录待应用的存储快照，在新 webview dom-ready 时恢复
+            if (storageSnapshot) {
+              window.__pendingStorageSnapshot = storageSnapshot;
+            } else {
+              window.__pendingStorageSnapshot = null;
+            }
+
+            // 移除容器内所有 webview
+            var existingWebviews = container.querySelectorAll('webview');
+            existingWebviews.forEach(function (wv) {
+              try {
+                wv.remove();
+              } catch (e) {}
+            });
+
+            // 重置标签页状态，只保留默认标签配置
+            tabs = [];
+            activeTabId = 'default';
+
+            var newWebview = document.createElement('webview');
+            newWebview.id = 'webview';
+            newWebview.style.cssText = 'width: 100%; height: 100%;';
+            newWebview.setAttribute('nodeintegration', 'false');
+            newWebview.setAttribute('contextIsolation', 'true');
+            newWebview.setAttribute('webpreferences', 'contextIsolation=true,nodeIntegration=false');
+            newWebview.setAttribute('allowpopups', 'true');
+            newWebview.setAttribute('webSecurity', 'true');
+            newWebview.setAttribute('partition', partition);
+
+            var targetUrl = (urlInput && urlInput.value) || '${a}';
+            if (targetUrl && (targetUrl.indexOf('http://') === 0 || targetUrl.indexOf('https://') === 0)) {
+              newWebview.src = targetUrl;
+            } else {
+              newWebview.src = '${a}';
+            }
+
+            container.appendChild(newWebview);
+
+            window.currentWebview = newWebview;
+            setupWebviewListeners(newWebview);
+
+            tabs.push({
+              id: 'default',
+              url: newWebview.src,
+              title: '${t || "新标签页"}',
+              webview: newWebview,
+            });
+
+            setTimeout(function () {
+              if (urlInput) {
+                urlInput.value = newWebview.src;
+                urlInput.title = newWebview.src;
+              }
+              updateNavButtons();
+            }, 200);
+          }
+
           // 标签页点击事件委托
           document.addEventListener('click', (e) => {
             const target = e.target;
@@ -929,7 +1156,7 @@ function buildChildWindowHtml(url, websiteName, websiteId) {
             tabs.splice(tabIndex, 1);
 
             if (tabs.length === 0) {
-              const homeUrl = '${url}';
+              const homeUrl = '${a}';
               createNewTab(homeUrl, '新标签页');
               return;
             }
@@ -985,7 +1212,7 @@ function buildChildWindowHtml(url, websiteName, websiteId) {
           homeBtn.addEventListener('click', () => {
             const currentWv = window.currentWebview;
             if (currentWv) {
-              currentWv.src = '${url}';
+              currentWv.src = '${a}';
             }
           });
 
@@ -1048,14 +1275,330 @@ function buildChildWindowHtml(url, websiteName, websiteId) {
             });
           }
 
-          switchBtn.addEventListener('click', () => {
-            const currentWv = window.currentWebview;
-            if (currentWv && currentWv.src) {
-              if (window.ipcRenderer) {
-                window.ipcRenderer.send('open-external', currentWv.src);
+          function getAccountKey() {
+            try {
+              const currentWv = window.currentWebview || webview;
+              const currentUrl = currentWv && currentWv.src ? currentWv.src : '${a}';
+              const u = new URL(currentUrl);
+              return u.origin;
+            } catch (e) {
+              try {
+                const u = new URL('${a}');
+                return u.origin;
+              } catch {
+                return websiteId || 'default-account-key';
               }
             }
-          });
+          }
+
+          async function loadAccounts() {
+            if (!window.ipcRenderer) return;
+            const key = getAccountKey();
+            accountState.key = key;
+            try {
+              let group = await window.ipcRenderer.invoke('account-get-list', { key });
+
+              if (!group || !Array.isArray(group.accounts)) {
+                group = { key, accounts: [], lastUsedAccountId: undefined };
+              }
+
+              if ((!group.accounts || group.accounts.length === 0) && window.currentWebview && window.currentWebview.getWebContentsId && window.currentWebview.executeJavaScript) {
+                const currentWv = window.currentWebview;
+                const webContentsId = currentWv.getWebContentsId();
+                const currentUrl = currentWv.src || '${a}';
+                try {
+                  const storageSnapshot = await currentWv.executeJavaScript('(function(){try{var makePlain=function(storage){var result={};if(!storage)return result;for(var i=0;i<storage.length;i++){var key=storage.key(i);try{result[key]=storage.getItem(key);}catch(e){result[key]=null;}}return result;};return{localStorage:makePlain(window.localStorage),sessionStorage:makePlain(window.sessionStorage)};}catch(e){console.warn("读取本地存储快照失败:",e);return{localStorage:{},sessionStorage:{}};}})();');
+                  group = await window.ipcRenderer.invoke('account-save-from-cookies', {
+                    key,
+                    name: '默认',
+                    webContentsId,
+                    url: currentUrl,
+                    storage: storageSnapshot,
+                  });
+                } catch (autoError) {
+                  console.warn('自动创建默认账号失败，将继续使用空列表:', autoError);
+                }
+              }
+
+              accountState.list = Array.isArray(group.accounts) ? group.accounts : [];
+              accountState.selectedAccountId = group.lastUsedAccountId || (accountState.list[0] && accountState.list[0].id) || '';
+              renderAccountList();
+            } catch (error) {
+              console.error('加载账号列表失败:', error);
+            }
+          }
+
+          function openAccountModal() {
+            if (!accountModalMask) return;
+            accountModalMask.classList.add('show');
+            accountInputRow.style.display = 'none';
+            accountNameError.style.display = 'none';
+            accountNameInput.value = '';
+            accountState.editingAccountId = '';
+            loadAccounts();
+          }
+
+          function closeAccountModal() {
+            if (!accountModalMask) return;
+            accountModalMask.classList.remove('show');
+          }
+
+          function renderAccountList() {
+            if (!accountList) return;
+            accountList.innerHTML = '';
+
+            if (!accountState.list || accountState.list.length === 0) {
+              const empty = document.createElement('div');
+              empty.className = 'account-empty';
+              empty.textContent = '暂无账号，点击上方“添加”保存当前登录状态为一个账号。';
+              accountList.appendChild(empty);
+              return;
+            }
+
+            accountState.list.forEach((item) => {
+              const row = document.createElement('div');
+              row.className = 'account-item';
+
+              const left = document.createElement('div');
+              left.className = 'account-item-left';
+
+              const radio = document.createElement('input');
+              radio.type = 'radio';
+              radio.name = 'account-radio';
+              radio.value = item.id;
+              if (item.id === accountState.selectedAccountId) {
+                radio.checked = true;
+              }
+
+              const nameSpan = document.createElement('span');
+              nameSpan.className = 'account-name';
+              nameSpan.textContent = item.name || '未命名账号';
+
+              left.appendChild(radio);
+              left.appendChild(nameSpan);
+
+              if (item.id === accountState.list[0].id) {
+                const tag = document.createElement('span');
+                tag.className = 'account-tag-default';
+                tag.textContent = '默认';
+                left.appendChild(tag);
+              }
+
+              const actions = document.createElement('div');
+              actions.className = 'account-actions';
+
+              const editBtn = document.createElement('button');
+              editBtn.className = 'account-small-btn';
+              editBtn.textContent = '编辑';
+              editBtn.addEventListener('click', () => {
+                accountInputRow.style.display = 'flex';
+                accountNameError.style.display = 'none';
+                accountNameInput.value = item.name || '';
+                accountState.editingAccountId = item.id;
+                accountNameInput.focus();
+              });
+
+              const deleteBtn = document.createElement('button');
+              deleteBtn.className = 'account-small-btn account-small-btn-danger';
+              deleteBtn.textContent = '删除';
+              deleteBtn.addEventListener('click', async () => {
+                if (!window.ipcRenderer) return;
+                try {
+                  await window.ipcRenderer.invoke('account-delete', { key: accountState.key || getAccountKey(), accountId: item.id });
+                  await loadAccounts();
+                } catch (error) {
+                  console.error('删除账号失败:', error);
+                }
+              });
+
+              actions.appendChild(editBtn);
+              actions.appendChild(deleteBtn);
+
+              row.appendChild(left);
+              row.appendChild(actions);
+
+              row.addEventListener('click', (event) => {
+                if (event.target === editBtn || event.target === deleteBtn) {
+                  return;
+                }
+                accountState.selectedAccountId = item.id;
+                renderAccountList();
+              });
+
+              radio.addEventListener('change', () => {
+                accountState.selectedAccountId = item.id;
+              });
+
+              accountList.appendChild(row);
+            });
+          }
+
+          async function captureAndSaveCurrentAccountSnapshot() {
+            if (!window.ipcRenderer) return;
+            const currentWv = window.currentWebview || webview;
+            if (!currentWv || !currentWv.executeJavaScript) return;
+
+            const key = accountState.key || getAccountKey();
+            try {
+              let group = await window.ipcRenderer.invoke('account-get-list', { key });
+              if (!group || !Array.isArray(group.accounts)) {
+                group = { key: key, accounts: [], lastUsedAccountId: undefined };
+              }
+
+              const partitionAttr = currentWv.getAttribute && currentWv.getAttribute('partition');
+              let currentAccount = null;
+              if (group.accounts && group.accounts.length > 0) {
+                if (partitionAttr) {
+                  currentAccount = group.accounts.find(function (item) { return item.partition === partitionAttr; });
+                }
+                if (!currentAccount) {
+                  const fallbackId = group.lastUsedAccountId || (group.accounts[0] && group.accounts[0].id);
+                  if (fallbackId) {
+                    currentAccount = group.accounts.find(function (item) { return item.id === fallbackId; }) || currentAccount;
+                  }
+                }
+              }
+
+              const storageSnapshot = await currentWv.executeJavaScript('(function(){try{var makePlain=function(storage){var result={};if(!storage)return result;for(var i=0;i<storage.length;i++){var key=storage.key(i);try{result[key]=storage.getItem(key);}catch(e){result[key]=null;}}return result;};return{localStorage:makePlain(window.localStorage),sessionStorage:makePlain(window.sessionStorage)};}catch(e){console.warn("读取本地存储快照失败:",e);return{localStorage:{},sessionStorage:{}};}})();');
+
+              const payload = {
+                key: key,
+                accountId: currentAccount ? currentAccount.id : undefined,
+                name: currentAccount ? (currentAccount.name || '默认') : '默认',
+                storage: storageSnapshot,
+              };
+              await window.ipcRenderer.invoke('account-save-from-cookies', payload);
+            } catch (error) {
+              console.error('保存当前账号存储快照失败:', error);
+            }
+          }
+
+          if (switchBtn) {
+            switchBtn.addEventListener('click', async () => {
+              await captureAndSaveCurrentAccountSnapshot();
+              openAccountModal();
+            });
+          }
+
+          if (accountModalClose) {
+            accountModalClose.addEventListener('click', () => {
+              closeAccountModal();
+            });
+          }
+
+          if (accountCancelBtn) {
+            accountCancelBtn.addEventListener('click', () => {
+              closeAccountModal();
+            });
+          }
+
+          if (accountAddBtn) {
+            accountAddBtn.addEventListener('click', () => {
+              accountInputRow.style.display = 'flex';
+              accountNameError.style.display = 'none';
+              accountNameInput.value = '';
+              accountState.editingAccountId = '';
+              accountNameInput.focus();
+            });
+          }
+
+          function validateAccountName() {
+            const name = (accountNameInput.value || '').trim();
+            if (!name) {
+              accountNameError.style.display = 'block';
+              accountNameInput.classList.add('account-input-error');
+              return false;
+            }
+            accountNameError.style.display = 'none';
+            accountNameInput.classList.remove('account-input-error');
+            return true;
+          }
+
+          if (accountSaveBtn) {
+            accountSaveBtn.addEventListener('click', async () => {
+              if (!validateAccountName()) return;
+              if (!window.ipcRenderer) return;
+
+              const name = accountNameInput.value.trim();
+              const currentWv = window.currentWebview || webview;
+              if (!currentWv || !currentWv.getWebContentsId || !currentWv.executeJavaScript) return;
+              const webContentsId = currentWv.getWebContentsId();
+              const currentUrl = currentWv.src || '${a}';
+
+              try {
+                const storageSnapshot = await currentWv.executeJavaScript('(function(){try{var makePlain=function(storage){var result={};if(!storage)return result;for(var i=0;i<storage.length;i++){var key=storage.key(i);try{result[key]=storage.getItem(key);}catch(e){result[key]=null;}}return result;};return{localStorage:makePlain(window.localStorage),sessionStorage:makePlain(window.sessionStorage)};}catch(e){console.warn("读取本地存储快照失败:",e);return{localStorage:{},sessionStorage:{}};}})();');
+
+                const group = await window.ipcRenderer.invoke('account-save-from-cookies', {
+                  key: accountState.key || getAccountKey(),
+                  accountId: accountState.editingAccountId || undefined,
+                  name,
+                  webContentsId,
+                  url: currentUrl,
+                  storage: storageSnapshot,
+                });
+                accountState.list = Array.isArray(group.accounts) ? group.accounts : [];
+                accountState.selectedAccountId = group.lastUsedAccountId || (accountState.list[0] && accountState.list[0].id) || '';
+                accountInputRow.style.display = 'none';
+                accountNameInput.value = '';
+                accountState.editingAccountId = '';
+                renderAccountList();
+              } catch (error) {
+                console.error('保存账号失败:', error);
+              }
+            });
+          }
+
+          if (accountNameInput) {
+            accountNameInput.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter') {
+                accountSaveBtn.click();
+              }
+            });
+          }
+
+          if (accountConfirmBtn) {
+            accountConfirmBtn.addEventListener('click', async () => {
+              if (!window.ipcRenderer) {
+                closeAccountModal();
+                return;
+              }
+
+              if (!accountState.selectedAccountId && accountState.list.length > 0) {
+                accountState.selectedAccountId = accountState.list[0].id;
+              }
+
+              if (!accountState.selectedAccountId) {
+                closeAccountModal();
+                return;
+              }
+
+              try {
+                const key = accountState.key || getAccountKey();
+                const accountId = accountState.selectedAccountId;
+                const group = await window.ipcRenderer.invoke('account-apply', {
+                  key: key,
+                  accountId: accountId,
+                });
+
+                if (group && group.accounts && group.accounts.length > 0) {
+                  accountState.list = group.accounts;
+                  accountState.selectedAccountId = group.lastUsedAccountId || accountId;
+
+                  var targetAccount = group.accounts.find(function (item) {
+                    return item.id === accountState.selectedAccountId;
+                  });
+
+                  if (targetAccount && targetAccount.partition) {
+                    switchToAccountPartition(targetAccount.partition, targetAccount.storageSnapshot || null);
+                  }
+                }
+              } catch (error) {
+                console.error('切换账号失败:', error);
+              }
+
+              closeAccountModal();
+            });
+          }
 
           setupWebviewListeners(webview);
 
@@ -1113,8 +1656,8 @@ function buildChildWindowHtml(url, websiteName, websiteId) {
 
           tabs.push({
             id: 'default',
-            url: '${url}',
-            title: '${websiteName || "新标签页"}',
+            url: '${a}',
+            title: '${t || "新标签页"}',
             webview: webview
           });
           activeTabId = 'default';
@@ -1123,463 +1666,405 @@ function buildChildWindowHtml(url, websiteName, websiteId) {
     </html>
   `;
 }
-const __dirname$1 = path$1.dirname(fileURLToPath(import.meta.url));
-process.env.APP_ROOT = path$1.join(__dirname$1, "..");
-const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
-const RENDERER_DIST = path$1.join(process.env.APP_ROOT, "dist");
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path$1.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
-let win;
-const childWindows = /* @__PURE__ */ new Map();
-function setupWindowStateSync(targetWindow) {
-  targetWindow.on("maximize", () => {
-    targetWindow.webContents.send("window-state-changed", true);
-  });
-  targetWindow.on("unmaximize", () => {
-    targetWindow.webContents.send("window-state-changed", false);
-  });
-  targetWindow.on("enter-full-screen", () => {
-    targetWindow.webContents.send("window-state-changed", true);
-  });
-  targetWindow.on("leave-full-screen", () => {
-    targetWindow.webContents.send("window-state-changed", false);
-  });
-  targetWindow.webContents.on("did-finish-load", () => {
-    const isMaximizedOrFull = targetWindow.isMaximized() || targetWindow.isFullScreen();
-    targetWindow.webContents.send("window-state-changed", isMaximizedOrFull);
-  });
-}
-function getIconsDir() {
-  const iconsDir = path$1.join(app.getPath("userData"), "icons");
-  if (!fs$1.existsSync(iconsDir)) {
-    fs$1.mkdirSync(iconsDir, { recursive: true });
+const X = "accounts.json", W = 2;
+class tt {
+  constructor() {
+    A(this, "storagePath");
+    this.storagePath = N.join(x.getPath("userData"), X), this.ensureInitialized();
   }
-  return iconsDir;
-}
-async function downloadIcon(iconUrl, websiteId) {
-  return new Promise((resolve) => {
+  ensureInitialized() {
+    if (!y.existsSync(this.storagePath)) {
+      this.saveData({ version: W, items: [] });
+      return;
+    }
     try {
-      const iconsDir = getIconsDir();
-      const ext = path$1.extname(new URL(iconUrl).pathname) || ".ico";
-      const iconPath = path$1.join(iconsDir, `${websiteId}${ext}`);
-      if (fs$1.existsSync(iconPath)) {
-        resolve(iconPath);
+      const t = y.readFileSync(this.storagePath, "utf-8"), e = JSON.parse(t);
+      (typeof e.version != "number" || !Array.isArray(e.items)) && this.saveData({ version: W, items: [] });
+    } catch {
+      this.saveData({ version: W, items: [] });
+    }
+  }
+  loadData() {
+    try {
+      const t = y.readFileSync(this.storagePath, "utf-8"), e = JSON.parse(t);
+      return !e || typeof e.version != "number" || !Array.isArray(e.items) ? { version: W, items: [] } : e;
+    } catch {
+      return { version: W, items: [] };
+    }
+  }
+  saveData(t) {
+    const e = {
+      version: W,
+      items: t.items || []
+    };
+    y.writeFileSync(this.storagePath, JSON.stringify(e, null, 2), "utf-8");
+  }
+  findGroup(t, e) {
+    return t.find((o) => o.key === e);
+  }
+  createPartitionName(t, e) {
+    return `persist:webtools_${t.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40)}_${e}`;
+  }
+  getAccountsForKey(t) {
+    const e = this.loadData(), o = this.findGroup(e.items, t);
+    if (o)
+      return o;
+    const n = { key: t, accounts: [] };
+    return e.items.push(n), this.saveData(e), n;
+  }
+  saveAccount(t, e) {
+    const o = this.loadData();
+    let n = this.findGroup(o.items, t);
+    if (n || (n = { key: t, accounts: [] }, o.items.push(n)), e.id) {
+      const r = n.accounts.findIndex((i) => i.id === e.id);
+      if (r !== -1) {
+        const i = n.accounts[r], d = e.partition || i.partition || this.createPartitionName(t, i.id);
+        n.accounts[r] = {
+          ...i,
+          name: e.name,
+          partition: d,
+          storageSnapshot: e.storageSnapshot ?? i.storageSnapshot
+        };
+      } else {
+        const i = e.id, d = e.partition || this.createPartitionName(t, i);
+        n.accounts.push({ id: i, name: e.name, partition: d, storageSnapshot: e.storageSnapshot });
+      }
+    } else {
+      const r = Date.now().toString(36) + Math.random().toString(36).slice(2, 10), i = e.partition || this.createPartitionName(t, r);
+      n.accounts.push({ id: r, name: e.name, partition: i, storageSnapshot: e.storageSnapshot }), n.lastUsedAccountId = r;
+    }
+    return this.saveData(o), n;
+  }
+  deleteAccount(t, e) {
+    const o = this.loadData();
+    let n = this.findGroup(o.items, t);
+    n || (n = { key: t, accounts: [] }, o.items.push(n));
+    const r = n.accounts.length;
+    return n.accounts = n.accounts.filter((i) => i.id !== e), n.lastUsedAccountId === e && (n.lastUsedAccountId = n.accounts.length > 0 ? n.accounts[0].id : void 0), r !== n.accounts.length && this.saveData(o), n;
+  }
+  setLastUsedAccount(t, e) {
+    const o = this.loadData();
+    let n = this.findGroup(o.items, t);
+    return n || (n = { key: t, accounts: [] }, o.items.push(n)), n.lastUsedAccountId = e, this.saveData(o), n;
+  }
+}
+const k = new tt(), C = f.dirname(J(import.meta.url));
+process.env.APP_ROOT = f.join(C, "..");
+const U = process.env.VITE_DEV_SERVER_URL, D = f.join(process.env.APP_ROOT, "dist");
+process.env.VITE_PUBLIC = U ? f.join(process.env.APP_ROOT, "public") : D;
+let c;
+const T = /* @__PURE__ */ new Map();
+function $(a) {
+  a.on("maximize", () => {
+    a.webContents.send("window-state-changed", !0);
+  }), a.on("unmaximize", () => {
+    a.webContents.send("window-state-changed", !1);
+  }), a.on("enter-full-screen", () => {
+    a.webContents.send("window-state-changed", !0);
+  }), a.on("leave-full-screen", () => {
+    a.webContents.send("window-state-changed", !1);
+  }), a.webContents.on("did-finish-load", () => {
+    const t = a.isMaximized() || a.isFullScreen();
+    a.webContents.send("window-state-changed", t);
+  });
+}
+function et() {
+  const a = f.join(x.getPath("userData"), "icons");
+  return m.existsSync(a) || m.mkdirSync(a, { recursive: !0 }), a;
+}
+async function L(a, t) {
+  return new Promise((e) => {
+    try {
+      const o = et(), n = f.extname(new URL(a).pathname) || ".ico", r = f.join(o, `${t}${n}`);
+      if (m.existsSync(r)) {
+        e(r);
         return;
       }
-      const file = fs$1.createWriteStream(iconPath);
-      const protocol = iconUrl.startsWith("https") ? https : http;
-      const request = protocol.get(iconUrl, { timeout: 3e3 }, (response) => {
-        if (response.statusCode === 301 || response.statusCode === 302) {
-          const redirectUrl = response.headers.location;
-          if (redirectUrl) {
-            file.close();
-            fs$1.unlinkSync(iconPath);
-            downloadIcon(redirectUrl, websiteId).then(resolve);
+      const i = m.createWriteStream(r), b = (a.startsWith("https") ? V : G).get(a, { timeout: 3e3 }, (g) => {
+        if (g.statusCode === 301 || g.statusCode === 302) {
+          const I = g.headers.location;
+          if (I) {
+            i.close(), m.unlinkSync(r), L(I, t).then(e);
             return;
           }
         }
-        if (response.statusCode !== 200) {
-          file.close();
-          fs$1.unlinkSync(iconPath);
-          resolve(null);
+        if (g.statusCode !== 200) {
+          i.close(), m.unlinkSync(r), e(null);
           return;
         }
-        response.pipe(file);
-        file.on("finish", () => {
-          file.close();
-          resolve(iconPath);
+        g.pipe(i), i.on("finish", () => {
+          i.close(), e(r);
         });
       });
-      request.on("error", () => {
-        file.close();
-        if (fs$1.existsSync(iconPath)) {
-          fs$1.unlinkSync(iconPath);
-        }
-        resolve(null);
+      b.on("error", () => {
+        i.close(), m.existsSync(r) && m.unlinkSync(r), e(null);
+      }), b.on("timeout", () => {
+        b.destroy(), i.close(), m.existsSync(r) && m.unlinkSync(r), e(null);
       });
-      request.on("timeout", () => {
-        request.destroy();
-        file.close();
-        if (fs$1.existsSync(iconPath)) {
-          fs$1.unlinkSync(iconPath);
-        }
-        resolve(null);
-      });
-    } catch (error) {
-      console.error("下载图标失败:", error);
-      resolve(null);
+    } catch (o) {
+      console.error("下载图标失败:", o), e(null);
     }
   });
 }
-async function createWindow() {
-  const savedSettings = settingsService.getSettings();
-  win = new BrowserWindow({
+async function j() {
+  const a = E.getSettings();
+  c = new z({
     width: 1200,
     height: 800,
-    icon: path$1.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
-    frame: false,
+    icon: f.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
+    frame: !1,
     // 无边框窗口
     titleBarStyle: "hidden",
     // 隐藏系统标题栏
-    autoHideMenuBar: true,
-    show: false,
+    autoHideMenuBar: !0,
+    show: !1,
     // 先不显示，等设置好大小后再显示
     webPreferences: {
-      preload: path$1.join(__dirname$1, "preload.mjs"),
-      webviewTag: true,
-      contextIsolation: true,
-      nodeIntegration: false
+      preload: f.join(C, "preload.mjs"),
+      webviewTag: !0,
+      contextIsolation: !0,
+      nodeIntegration: !1
     }
-  });
-  setupWindowStateSync(win);
-  if (savedSettings.homeWindowSize === "maximized") {
-    win.maximize();
-  } else if (savedSettings.homeWindowSize === "fullscreen") {
-    win.setFullScreen(true);
-  }
-  win.show();
-  win.webContents.on("before-input-event", (event, input) => {
-    if (input.key === "Alt") {
-      event.preventDefault();
+  }), $(c), a.homeWindowSize === "maximized" ? c.maximize() : a.homeWindowSize === "fullscreen" && c.setFullScreen(!0), c.show(), c.webContents.on("before-input-event", (t, e) => {
+    if (e.key === "Alt") {
+      t.preventDefault();
       return;
     }
-    if (input.key === "F12") {
-      if (win == null ? void 0 : win.webContents.isDevToolsOpened()) {
-        win.webContents.closeDevTools();
-      } else {
-        win == null ? void 0 : win.webContents.openDevTools();
-      }
-      event.preventDefault();
-    } else if (input.key === "F5") {
-      win == null ? void 0 : win.webContents.reload();
-      event.preventDefault();
-    }
-  });
-  win.webContents.on("did-finish-load", () => {
-    win == null ? void 0 : win.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
-  });
-  if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL);
-  } else {
-    win.loadFile(path$1.join(RENDERER_DIST, "index.html"));
+    e.key === "F12" ? (c != null && c.webContents.isDevToolsOpened() ? c.webContents.closeDevTools() : c == null || c.webContents.openDevTools(), t.preventDefault()) : e.key === "F5" && (c == null || c.webContents.reload(), t.preventDefault());
+  }), c.webContents.on("did-finish-load", () => {
+    c == null || c.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
+  }), U ? c.loadURL(U) : c.loadFile(f.join(D, "index.html"));
+}
+function nt(a, t) {
+  try {
+    return new URL(a).origin;
+  } catch {
+    return t || "default-account-key";
   }
 }
-async function createChildWindow(url, windowId, windowMode = "maximized", websiteName, websiteIcon, _width = 1200, _height = 800, websiteId) {
-  let mode;
-  if (typeof windowMode === "boolean") {
-    mode = windowMode ? "fullscreen" : "maximized";
-  } else {
-    mode = windowMode;
+async function M(a, t, e = "maximized", o, n, r = 1200, i = 800, d) {
+  let b;
+  typeof e == "boolean" ? b = e ? "fullscreen" : "maximized" : b = e;
+  const g = nt(a, d);
+  let I;
+  try {
+    let u = k.getAccountsForKey(g);
+    (!u.accounts || u.accounts.length === 0) && (u = k.saveAccount(g, { name: "默认" }));
+    const w = u.accounts[0] ? u.accounts[0].id : void 0, S = u.lastUsedAccountId || w, p = S ? u.accounts.find((h) => h.id === S) : void 0;
+    p && p.partition && (I = p.partition);
+  } catch (u) {
+    console.error("解析账号 partition 失败:", u);
   }
-  let windowIcon = path$1.join(process.env.VITE_PUBLIC || __dirname$1, "electron-vite.svg");
-  if (websiteIcon) {
+  let B = f.join(process.env.VITE_PUBLIC || C, "electron-vite.svg");
+  if (n)
     try {
-      const iconPath = await downloadIcon(websiteIcon, `window_${windowId}`);
-      if (iconPath && fs$1.existsSync(iconPath)) {
-        windowIcon = iconPath;
-      }
-    } catch (error) {
+      const u = await L(n, `window_${t}`);
+      u && m.existsSync(u) && (B = u);
+    } catch {
       console.log("下载网站图标失败，使用默认图标");
     }
-  }
-  const childWin = new BrowserWindow({
+  const s = new z({
     width: 1200,
     height: 800,
-    show: false,
+    show: !1,
     // 先不显示，等设置好大小后再显示
-    fullscreen: mode === "fullscreen",
-    frame: false,
+    fullscreen: b === "fullscreen",
+    frame: !1,
     // 无边框窗口
     titleBarStyle: "hidden",
     // 隐藏系统标题栏
-    autoHideMenuBar: true,
-    icon: windowIcon,
+    autoHideMenuBar: !0,
+    icon: B,
     webPreferences: {
-      preload: path$1.join(__dirname$1, "preload.mjs"),
-      webviewTag: true,
-      contextIsolation: true,
-      nodeIntegration: false
+      preload: f.join(C, "preload.mjs"),
+      webviewTag: !0,
+      contextIsolation: !0,
+      nodeIntegration: !1
     }
   });
-  childWin.__websiteUrl = url;
-  setupWindowStateSync(childWin);
-  if (mode === "maximized") {
-    childWin.maximize();
-  }
-  childWin.once("ready-to-show", () => {
-    childWin.show();
-  });
-  childWin.webContents.on("before-input-event", (event, input) => {
-    if (input.key === "F12") {
-      if (childWin.webContents.isDevToolsOpened()) {
-        childWin.webContents.closeDevTools();
-      } else {
-        childWin.webContents.openDevTools();
-      }
-      event.preventDefault();
-    } else if (input.key === "F5") {
-      childWin.webContents.reload();
-      event.preventDefault();
-    }
-  });
-  childWin.webContents.on("did-attach-webview", (_event, webContents) => {
-    if (!webContents || !webContents.setWindowOpenHandler) return;
-    webContents.setWindowOpenHandler((details) => {
+  s.__websiteUrl = a, $(s), b === "maximized" && s.maximize(), s.once("ready-to-show", () => {
+    s.show();
+  }), s.webContents.on("before-input-event", (u, w) => {
+    w.key === "F12" ? (s.webContents.isDevToolsOpened() ? s.webContents.closeDevTools() : s.webContents.openDevTools(), u.preventDefault()) : w.key === "F5" && (s.webContents.reload(), u.preventDefault());
+  }), s.webContents.on("did-attach-webview", (u, w) => {
+    !w || !w.setWindowOpenHandler || w.setWindowOpenHandler((S) => {
       try {
-        const url2 = details.url;
-        if (url2 && (url2.startsWith("http://") || url2.startsWith("https://"))) {
-          childWin.webContents.send("webview-new-window", url2);
-          return { action: "deny" };
-        }
-      } catch (error) {
-        console.error("Error in webview windowOpen handler:", error);
+        const p = S.url;
+        if (p && (p.startsWith("http://") || p.startsWith("https://")))
+          return s.webContents.send("webview-new-window", p), { action: "deny" };
+      } catch (p) {
+        console.error("Error in webview windowOpen handler:", p);
       }
       return { action: "allow" };
     });
   });
-  const htmlContent = buildChildWindowHtml(url, websiteName, websiteId);
-  childWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(htmlContent));
-  if (websiteName) {
-    childWin.setTitle(websiteName);
-  }
-  childWin.webContents.on("dom-ready", () => {
-    const websiteData = storageService.getWebsites().find((w) => w.url === url);
-    if (websiteData && websiteData.customButtons) {
-      childWin.webContents.executeJavaScript(`
+  const O = Q(a, o, d, I);
+  return s.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(O)), o && s.setTitle(o), s.webContents.on("dom-ready", () => {
+    const u = v.getWebsites().find((w) => w.url === a);
+    u && u.customButtons && s.webContents.executeJavaScript(`
         window.postMessage({
           type: 'updateCustomButtons',
-          buttons: ${JSON.stringify(websiteData.customButtons)}
+          buttons: ${JSON.stringify(u.customButtons)}
         }, '*');
       `);
-    }
-  });
-  childWin.webContents.on("ipc-message", (event, channel, ...args) => {
-    if (channel === "requestCustomButtons") {
-      const websiteData = storageService.getWebsites().find((w) => w.url === url);
-      if (websiteData && websiteData.customButtons) {
-        event.sender.send("updateCustomButtons", websiteData.customButtons);
+  }), s.webContents.on("ipc-message", (u, w, ...S) => {
+    if (w === "requestCustomButtons") {
+      const p = v.getWebsites().find((h) => h.url === a);
+      p && p.customButtons && u.sender.send("updateCustomButtons", p.customButtons);
+    } else if (w === "openNewWindow") {
+      const [p, h] = S;
+      M(p, Date.now().toString(), "maximized", h);
+    } else if (w === "openAddButtonModal") {
+      let h = S[0];
+      if (!h) {
+        const P = v.getWebsites().find((F) => F.url === a);
+        P && (h = P.id);
       }
-    } else if (channel === "openNewWindow") {
-      const [url2, name] = args;
-      createChildWindow(url2, Date.now().toString(), "maximized", name);
-    } else if (channel === "openAddButtonModal") {
-      const passedWebsiteId = args[0];
-      let targetWebsiteId = passedWebsiteId;
-      if (!targetWebsiteId) {
-        const websiteData = storageService.getWebsites().find((w) => w.url === url);
-        if (websiteData) {
-          targetWebsiteId = websiteData.id;
-        }
-      }
-      if (targetWebsiteId && win) {
-        win.webContents.send("open-add-button-modal", targetWebsiteId);
-        win.show();
-        if (win.isMinimized()) win.restore();
-      }
+      h && c && (c.webContents.send("open-add-button-modal", h), c.show(), c.isMinimized() && c.restore());
     }
-  });
-  childWindows.set(windowId, childWin);
-  childWin.on("closed", () => {
-    childWindows.delete(windowId);
-  });
-  childWin.webContents.on("page-title-updated", (event, title) => {
-    if (websiteName) {
-      event.preventDefault();
-      childWin.setTitle(websiteName);
-    } else {
-      childWin.setTitle(title);
-    }
-  });
-  return childWin;
+  }), T.set(t, s), s.on("closed", () => {
+    T.delete(t);
+  }), s.webContents.on("page-title-updated", (u, w) => {
+    o ? (u.preventDefault(), s.setTitle(o)) : s.setTitle(w);
+  }), s;
 }
-function setupIpcHandlers() {
-  ipcMain.handle("get-websites", () => {
-    return storageService.getWebsites();
-  });
-  ipcMain.handle("add-website", (_event, website) => {
-    return storageService.addWebsite(website);
-  });
-  ipcMain.handle("update-website", (_event, id, updates) => {
-    return storageService.updateWebsite(id, updates);
-  });
-  ipcMain.handle("delete-website", (_event, id) => {
-    return storageService.deleteWebsite(id);
-  });
-  ipcMain.handle("add-custom-button", (_event, websiteId, button) => {
-    return storageService.addCustomButton(websiteId, button);
-  });
-  ipcMain.handle("update-custom-button", (_event, websiteId, buttonId, updates) => {
-    return storageService.updateCustomButton(websiteId, buttonId, updates);
-  });
-  ipcMain.handle("delete-custom-button", (_event, websiteId, buttonId) => {
-    return storageService.deleteCustomButton(websiteId, buttonId);
-  });
-  ipcMain.handle("create-window", async (_event, url, windowMode = "maximized", websiteName, websiteIcon, width, height, websiteId) => {
-    const windowId = Date.now().toString();
-    await createChildWindow(url, windowId, windowMode, websiteName, websiteIcon, width, height, websiteId);
-    return windowId;
-  });
-  ipcMain.handle("navigate-to-url", (_event, windowId, url) => {
-    const childWin = childWindows.get(windowId);
-    if (childWin) {
-      childWin.webContents.loadURL(url);
-    }
-  });
-  ipcMain.handle("add-to-desktop", async (_event, websiteData) => {
+function ot() {
+  l.handle("account-get-list", async (a, t) => {
+    const { key: e } = t;
+    return k.getAccountsForKey(e);
+  }), l.handle("account-save-from-cookies", async (a, t) => {
+    const { key: e, accountId: o, name: n, storage: r } = t;
     try {
-      const desktopPath = app.getPath("desktop");
-      const shortcutPath = path$1.join(desktopPath, `${websiteData.name}.lnk`);
-      const exePath = process.execPath;
-      let iconPath = exePath;
-      if (websiteData.icon && websiteData.icon.includes("favicon.ico")) {
+      return k.saveAccount(e, {
+        id: o,
+        name: n,
+        storageSnapshot: r
+      });
+    } catch (i) {
+      throw console.error("保存账号失败:", i), i;
+    }
+  }), l.handle("account-apply", async (a, t) => {
+    const { key: e, accountId: o } = t;
+    try {
+      const n = k.getAccountsForKey(e);
+      return n.accounts.find((d) => d.id === o) ? k.setLastUsedAccount(e, o) : n;
+    } catch (n) {
+      throw console.error("应用账号失败:", n), n;
+    }
+  }), l.handle("account-delete", async (a, t) => {
+    const { key: e, accountId: o } = t;
+    try {
+      return k.deleteAccount(e, o);
+    } catch (n) {
+      throw console.error("删除账号失败:", n), n;
+    }
+  }), l.handle("get-websites", () => v.getWebsites()), l.handle("add-website", (a, t) => v.addWebsite(t)), l.handle("update-website", (a, t, e) => v.updateWebsite(t, e)), l.handle("delete-website", (a, t) => v.deleteWebsite(t)), l.handle("add-custom-button", (a, t, e) => v.addCustomButton(t, e)), l.handle("update-custom-button", (a, t, e, o) => v.updateCustomButton(t, e, o)), l.handle("delete-custom-button", (a, t, e) => v.deleteCustomButton(t, e)), l.handle("create-window", async (a, t, e = "maximized", o, n, r, i, d) => {
+    const b = Date.now().toString();
+    return await M(t, b, e, o, n, r, i, d), b;
+  }), l.handle("navigate-to-url", (a, t, e) => {
+    const o = T.get(t);
+    o && o.webContents.loadURL(e);
+  }), l.handle("add-to-desktop", async (a, t) => {
+    try {
+      const e = x.getPath("desktop"), o = f.join(e, `${t.name}.lnk`), n = process.execPath;
+      let r = n;
+      if (t.icon && t.icon.includes("favicon.ico"))
         try {
-          const faviconPath = await downloadIcon(websiteData.icon, websiteData.id || Date.now().toString());
-          if (faviconPath) {
-            iconPath = faviconPath;
-          }
-        } catch (err) {
+          const d = await L(t.icon, t.id || Date.now().toString());
+          d && (r = d);
+        } catch {
           console.log("favicon.ico下载失败，尝试备用方案");
         }
-      }
-      if (iconPath === exePath && websiteData.url) {
+      if (r === n && t.url)
         try {
-          const urlObj = new URL(websiteData.url);
-          const rootFaviconUrl = `${urlObj.origin}/favicon.ico`;
-          const rootFaviconPath = await downloadIcon(rootFaviconUrl, `root_${websiteData.id || Date.now().toString()}`);
-          if (rootFaviconPath) {
-            iconPath = rootFaviconPath;
-          }
-        } catch (err) {
+          const b = `${new URL(t.url).origin}/favicon.ico`, g = await L(b, `root_${t.id || Date.now().toString()}`);
+          g && (r = g);
+        } catch {
           console.log("根目录favicon获取失败");
         }
+      if (r === n) {
+        const d = f.join(process.env.VITE_PUBLIC || C, "icon.ico");
+        m.existsSync(d) && (r = d);
       }
-      if (iconPath === exePath) {
-        const appIconPath = path$1.join(process.env.VITE_PUBLIC || __dirname$1, "icon.ico");
-        if (fs$1.existsSync(appIconPath)) {
-          iconPath = appIconPath;
-        }
-      }
-      const success = shell.writeShortcutLink(shortcutPath, {
-        target: exePath,
-        args: `--website-url="${websiteData.url}" --website-name="${websiteData.name}"`,
-        description: websiteData.name,
-        icon: iconPath,
+      if (R.writeShortcutLink(o, {
+        target: n,
+        args: `--website-url="${t.url}" --website-name="${t.name}"`,
+        description: t.name,
+        icon: r,
         iconIndex: 0
-      });
-      if (success) {
-        return { success: true, iconPath };
-      } else {
-        throw new Error("创建快捷方式失败");
-      }
-    } catch (error) {
-      console.error("添加到桌面失败:", error);
-      throw error;
+      }))
+        return { success: !0, iconPath: r };
+      throw new Error("创建快捷方式失败");
+    } catch (e) {
+      throw console.error("添加到桌面失败:", e), e;
     }
-  });
-  ipcMain.handle("get-settings", () => {
-    return settingsService.getSettings();
-  });
-  ipcMain.handle("save-settings", (_event, settings) => {
-    const updatedSettings = settingsService.updateSettings(settings);
-    if (settings.autoStart !== void 0) {
-      settingsService.setAutoStart(settings.autoStart).catch(console.error);
-    }
-    return updatedSettings;
-  });
-  ipcMain.handle("get-auto-start-status", () => {
-    return settingsService.getAutoStartStatus();
-  });
-  ipcMain.on("open-add-custom-button", (_event, data) => {
-    console.log("Received open-add-custom-button message (legacy, no-op):", data);
-  });
-  ipcMain.on("open-custom-button-manager", (_event, data) => {
-    console.log("open-custom-button-manager is deprecated, data:", data);
-  });
-  ipcMain.on("window-control", (event, action) => {
-    const window = BrowserWindow.fromWebContents(event.sender);
-    if (window) {
-      switch (action) {
+  }), l.handle("get-settings", () => E.getSettings()), l.handle("save-settings", (a, t) => {
+    const e = E.updateSettings(t);
+    return t.autoStart !== void 0 && E.setAutoStart(t.autoStart).catch(console.error), e;
+  }), l.handle("get-auto-start-status", () => E.getAutoStartStatus()), l.on("open-add-custom-button", (a, t) => {
+    console.log("Received open-add-custom-button message (legacy, no-op):", t);
+  }), l.on("open-custom-button-manager", (a, t) => {
+    console.log("open-custom-button-manager is deprecated, data:", t);
+  }), l.on("window-control", (a, t) => {
+    const e = z.fromWebContents(a.sender);
+    if (e)
+      switch (t) {
         case "minimize":
-          window.minimize();
+          e.minimize();
           break;
         case "maximize":
-          if (window.isMaximized()) {
-            window.unmaximize();
-            window.webContents.send("window-state-changed", false);
-          } else {
-            window.maximize();
-            window.webContents.send("window-state-changed", true);
-          }
+          e.isMaximized() ? (e.unmaximize(), e.webContents.send("window-state-changed", !1)) : (e.maximize(), e.webContents.send("window-state-changed", !0));
           break;
         case "close":
-          window.close();
+          e.close();
           break;
       }
-    }
-  });
-  ipcMain.on("open-external", (_event, url) => {
-    shell.openExternal(url).catch((err) => {
-      console.error("打开外部链接失败:", err);
+  }), l.on("open-external", (a, t) => {
+    R.openExternal(t).catch((e) => {
+      console.error("打开外部链接失败:", e);
     });
-  });
-  ipcMain.on("custom-buttons-updated", (_event, websiteId) => {
+  }), l.on("custom-buttons-updated", (a, t) => {
     try {
-      const websites = storageService.getWebsites();
-      const website = websites.find((w) => w.id === websiteId);
-      if (!website) return;
-      const buttons = website.customButtons || [];
-      childWindows.forEach((childWin) => {
-        const websiteUrl = childWin.__websiteUrl;
-        if (!websiteUrl || websiteUrl !== website.url) return;
-        childWin.webContents.executeJavaScript(`
+      const o = v.getWebsites().find((r) => r.id === t);
+      if (!o) return;
+      const n = o.customButtons || [];
+      T.forEach((r) => {
+        const i = r.__websiteUrl;
+        !i || i !== o.url || r.webContents.executeJavaScript(`
           window.postMessage({
             type: 'updateCustomButtons',
-            buttons: ${JSON.stringify(buttons)}
+            buttons: ${JSON.stringify(n)}
           }, '*');
         `);
       });
-    } catch (error) {
-      console.error("同步自定义按钮到子窗口失败:", error);
+    } catch (e) {
+      console.error("同步自定义按钮到子窗口失败:", e);
     }
   });
 }
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-    win = null;
-  }
+x.on("window-all-closed", () => {
+  process.platform !== "darwin" && (x.quit(), c = null);
 });
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow().catch(console.error);
-  }
+x.on("activate", () => {
+  z.getAllWindows().length === 0 && j().catch(console.error);
 });
-app.whenReady().then(() => {
-  setupIpcHandlers();
-  const websiteUrlArg = process.argv.find((arg) => arg.startsWith("--website-url="));
-  const websiteNameArg = process.argv.find((arg) => arg.startsWith("--website-name="));
-  if (websiteUrlArg) {
-    const url = websiteUrlArg.split("=")[1].replace(/"/g, "");
-    const websiteName = websiteNameArg ? websiteNameArg.split("=")[1].replace(/"/g, "") : void 0;
-    const windowId = Date.now().toString();
-    createChildWindow(url, windowId, "maximized", websiteName).catch(console.error);
-  } else {
-    createWindow().catch(console.error);
-  }
+x.whenReady().then(() => {
+  ot();
+  const a = process.argv.find((e) => e.startsWith("--website-url=")), t = process.argv.find((e) => e.startsWith("--website-name="));
+  if (a) {
+    const e = a.split("=")[1].replace(/"/g, ""), o = t ? t.split("=")[1].replace(/"/g, "") : void 0, n = Date.now().toString();
+    M(e, n, "maximized", o).catch(console.error);
+  } else
+    j().catch(console.error);
 });
-app.on("second-instance", (_event, commandLine) => {
-  const websiteUrlArg = commandLine.find((arg) => arg.startsWith("--website-url="));
-  const websiteNameArg = commandLine.find((arg) => arg.startsWith("--website-name="));
-  if (websiteUrlArg) {
-    const url = websiteUrlArg.split("=")[1].replace(/"/g, "");
-    const websiteName = websiteNameArg ? websiteNameArg.split("=")[1].replace(/"/g, "") : void 0;
-    const windowId = Date.now().toString();
-    createChildWindow(url, windowId, "maximized", websiteName).catch(console.error);
-  } else if (win) {
-    if (win.isMinimized()) win.restore();
-    win.focus();
-  }
+x.on("second-instance", (a, t) => {
+  const e = t.find((n) => n.startsWith("--website-url=")), o = t.find((n) => n.startsWith("--website-name="));
+  if (e) {
+    const n = e.split("=")[1].replace(/"/g, ""), r = o ? o.split("=")[1].replace(/"/g, "") : void 0, i = Date.now().toString();
+    M(n, i, "maximized", r).catch(console.error);
+  } else c && (c.isMinimized() && c.restore(), c.focus());
 });
 export {
-  RENDERER_DIST,
-  VITE_DEV_SERVER_URL
+  D as RENDERER_DIST,
+  U as VITE_DEV_SERVER_URL
 };
